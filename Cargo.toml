@@ -1,0 +1,20 @@
+[package]
+name = "mini_gl_ui"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+gl = "0.14"
+glam = "0.24"
+
+# The demo example requires glfw and X11 libraries on Linux
+# On Ubuntu/Debian: sudo apt-get install libx11-dev libxrandr-dev libxi-dev
+# On Fedora: sudo dnf install libX11-devel libXrandr-devel libXi-devel
+# Uncomment to build examples:
+# [dev-dependencies]
+# glfw = "0.54"
+
+[[example]]
+name = "demo"
+path = "examples/demo.rs"
+required-features = []
