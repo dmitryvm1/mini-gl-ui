@@ -160,7 +160,7 @@ The library is designed to be easily extensible:
 
 Potential areas for improvement:
 
-1. **Text Rendering**: Integrate a text rendering library (e.g., rusttype, freetype)
+1. **Text Rendering**: Integrate a text rendering library (e.g., fontdue, freetype)
 2. **Texture Support**: Add texture rendering to widgets
 3. **Layout System**: Add automatic layout management
 4. **Event System**: Create a proper event handling system
