@@ -21,7 +21,7 @@ fn main() {
     window.make_current();
     
     // Load OpenGL function pointers
-    gl::load_with(|symbol| window.get_proc_address(symbol) as *const _);
+    gl::load_with(|symbol| window.get_proc_address(symbol) as *const std::ffi::c_void);
     
     // Enable blending for transparency
     unsafe {
@@ -30,11 +30,18 @@ fn main() {
     }
     
     // Create renderer
-    let renderer = QuadRenderer::new().expect("Failed to create quad renderer");
+    let mut renderer = QuadRenderer::new().expect("Failed to create quad renderer");
     
     // Set up orthographic projection
     let projection = Mat4::orthographic_rh_gl(0.0, 800.0, 600.0, 0.0, -1.0, 1.0);
     renderer.set_projection(&projection);
+
+    // Configure font for text rendering (Windows system fonts)
+    if let Ok(bytes) = std::fs::read(r"C:\Windows\Fonts\segoeui.ttf") {
+        renderer.set_font_from_bytes(&bytes, 18.0).ok();
+    } else if let Ok(bytes) = std::fs::read(r"C:\Windows\Fonts\arial.ttf") {
+        renderer.set_font_from_bytes(&bytes, 18.0).ok();
+    }
     
     // Create UI components
     let mut label = Label::new(

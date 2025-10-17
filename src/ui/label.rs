@@ -1,3 +1,4 @@
+use crate::colors;
 use crate::renderer::QuadRenderer;
 use crate::ui::Widget;
 use glam::{Vec2, Vec4};
@@ -39,9 +40,12 @@ impl Label {
 
 impl Widget for Label {
     fn draw(&self, renderer: &QuadRenderer) {
-        // For now, just render as a colored rectangle
-        // In a real implementation, this would render text
+        // Background
         renderer.draw_rect(self.position, self.size, self.color);
+        // Text (top-left with small padding)
+        let padding = 6.0;
+        let text_pos = Vec2::new(self.position.x + padding, self.position.y + padding);
+        renderer.draw_text(text_pos, colors::BLACK, &self.text);
     }
     
     fn position(&self) -> Vec2 {

@@ -62,6 +62,11 @@ impl Widget for Checkbox {
             );
             renderer.draw_rect(check_pos, check_size, colors::GREEN);
         }
+
+        // Draw label to the right of the box
+        let spacing = 8.0;
+        let text_pos = Vec2::new(self.position.x + self.size.x + spacing, self.position.y);
+        renderer.draw_text(text_pos, colors::BLACK, &self.label);
     }
     
     fn position(&self) -> Vec2 {

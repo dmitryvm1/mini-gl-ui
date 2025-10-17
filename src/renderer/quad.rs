@@ -1,4 +1,5 @@
 use crate::primitives::{Shader, VertexArray, VertexBuffer};
+use crate::renderer::TextRenderer;
 use glam::{Mat4, Vec2, Vec4};
 use std::mem;
 
@@ -7,6 +8,8 @@ pub struct QuadRenderer {
     shader: Shader,
     vao: VertexArray,
     _vbo: VertexBuffer,
+    text: Option<TextRenderer>,
+    last_projection: Option<Mat4>,
 }
 
 impl QuadRenderer {
@@ -73,13 +76,17 @@ impl QuadRenderer {
         
         vao.unbind();
         
-        Ok(QuadRenderer { shader, vao, _vbo: vbo })
+        Ok(QuadRenderer { shader, vao, _vbo: vbo, text: None, last_projection: None })
     }
     
     /// Sets the projection matrix
-    pub fn set_projection(&self, projection: &Mat4) {
+    pub fn set_projection(&mut self, projection: &Mat4) {
         self.shader.use_program();
         self.shader.set_mat4("projection", projection);
+        if let Some(text) = &self.text {
+            text.set_projection(projection);
+        }
+        self.last_projection = Some(*projection);
     }
     
     /// Draws a filled rectangle
@@ -114,5 +121,28 @@ impl QuadRenderer {
             Vec2::new(thickness, size.y),
             color,
         );
+    }
+
+    /// Initializes a font for text rendering from bytes
+    pub fn set_font_from_bytes(&mut self, font_bytes: &[u8], px: f32) -> Result<(), String> {
+        let tr = TextRenderer::from_bytes(font_bytes, px)?;
+        // If we already have a projection, apply it to the new text renderer
+        if let Some(p) = self.last_projection {
+            tr.set_projection(&p);
+        }
+        self.text = Some(tr);
+        Ok(())
+    }
+
+    /// Draws text at the given position using the configured font
+    pub fn draw_text(&self, position: Vec2, color: Vec4, text: &str) {
+        if let Some(tr) = &self.text {
+            tr.draw_text(position, color, text);
+        }
+    }
+
+    /// Measures text dimensions using the configured font; returns zero when unavailable
+    pub fn measure_text(&self, text: &str) -> Vec2 {
+        if let Some(tr) = &self.text { tr.measure(text) } else { Vec2::ZERO }
     }
 }

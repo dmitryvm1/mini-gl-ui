@@ -1,4 +1,5 @@
 use gl::types::*;
+use std::ffi::c_void;
 use std::ptr;
 
 /// A wrapper around OpenGL textures
@@ -61,7 +62,7 @@ impl Texture {
                 self.height as i32,
                 gl::RGBA,
                 gl::UNSIGNED_BYTE,
-                data.as_ptr() as *const _,
+                data.as_ptr() as *const c_void,
             );
             gl::BindTexture(gl::TEXTURE_2D, 0);
         }

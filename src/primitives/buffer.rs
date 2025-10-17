@@ -1,4 +1,5 @@
 use gl::types::*;
+use std::ffi::c_void;
 use std::mem;
 
 /// A wrapper around OpenGL Vertex Buffer Object (VBO)
@@ -30,7 +31,7 @@ impl VertexBuffer {
             gl::BufferData(
                 gl::ARRAY_BUFFER,
                 (data.len() * mem::size_of::<T>()) as GLsizeiptr,
-                data.as_ptr() as *const _,
+                data.as_ptr() as *const c_void,
                 usage,
             );
         }
@@ -93,7 +94,7 @@ impl VertexArray {
                 data_type,
                 normalized,
                 stride,
-                offset as *const _,
+                offset as *const c_void,
             );
         }
     }

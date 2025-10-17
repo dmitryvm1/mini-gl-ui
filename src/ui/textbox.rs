@@ -80,8 +80,13 @@ impl Widget for TextBox {
         };
         renderer.draw_rect_outline(self.position, self.size, border_color, 2.0);
         
-        // In a real implementation, this would render the text content
-        // For now, we just show a visual indicator of the textbox state
+        // Draw text content
+        let padding = 6.0;
+        let text_pos = Vec2::new(self.position.x + padding, self.position.y + padding);
+        let text_color = colors::BLACK;
+        if !self.text.is_empty() {
+            renderer.draw_text(text_pos, text_color, &self.text);
+        }
     }
     
     fn position(&self) -> Vec2 {

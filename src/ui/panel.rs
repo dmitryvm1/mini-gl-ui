@@ -85,6 +85,13 @@ impl Widget for Panel {
         let title_bar_pos = self.position;
         let title_bar_size = Vec2::new(self.size.x, self.title_bar_height);
         renderer.draw_rect(title_bar_pos, title_bar_size, self.title_bar_color);
+        // Title text centered in title bar
+        let text_size = renderer.measure_text(&self.title);
+        let text_pos = Vec2::new(
+            self.position.x + (self.size.x - text_size.x) * 0.5,
+            self.position.y + (self.title_bar_height - text_size.y) * 0.5,
+        );
+        renderer.draw_text(text_pos, colors::WHITE, &self.title);
         
         // Draw panel background
         let panel_pos = Vec2::new(self.position.x, self.position.y + self.title_bar_height);

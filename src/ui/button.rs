@@ -75,6 +75,13 @@ impl Widget for Button {
         let color = self.current_color();
         renderer.draw_rect(self.position, self.size, color);
         renderer.draw_rect_outline(self.position, self.size, colors::BLACK, 2.0);
+        // Centered text
+        let text_size = renderer.measure_text(&self.label);
+        let text_pos = Vec2::new(
+            self.position.x + (self.size.x - text_size.x) * 0.5,
+            self.position.y + (self.size.y - text_size.y) * 0.5,
+        );
+        renderer.draw_text(text_pos, colors::BLACK, &self.label);
     }
     
     fn position(&self) -> Vec2 {
