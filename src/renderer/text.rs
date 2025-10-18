@@ -10,6 +10,9 @@ pub struct TextRenderer {
     shader: Shader,
     vao: VertexArray,
     _vbo: VertexBuffer,
+    // Cached line metrics approximated from representative glyphs
+    line_ascent: f32,
+    line_descent: f32,
 }
 
 impl TextRenderer {
@@ -54,10 +57,10 @@ impl TextRenderer {
         // Shared quad geometry: two triangles (TRIANGLE_FAN) with texcoords
         let vertices: [f32; 16] = [
             // positions   // tex coords
-            0.0, 1.0,      0.0, 1.0, // top left
-            1.0, 1.0,      1.0, 1.0, // top right
-            1.0, 0.0,      1.0, 0.0, // bottom right
-            0.0, 0.0,      0.0, 0.0, // bottom left
+            0.0, 1.0, 0.0, 1.0, // top left
+            1.0, 1.0, 1.0, 1.0, // top right
+            1.0, 0.0, 1.0, 0.0, // bottom right
+            0.0, 0.0, 0.0, 0.0, // bottom left
         ];
 
         let vao = VertexArray::new();
@@ -65,11 +68,51 @@ impl TextRenderer {
 
         vao.bind();
         vbo.set_data(&vertices, gl::STATIC_DRAW);
-        vao.set_attribute(0, 2, gl::FLOAT, gl::FALSE, 4 * mem::size_of::<f32>() as i32, 0);
-        vao.set_attribute(1, 2, gl::FLOAT, gl::FALSE, 4 * mem::size_of::<f32>() as i32, 2 * mem::size_of::<f32>());
+        vao.set_attribute(
+            0,
+            2,
+            gl::FLOAT,
+            gl::FALSE,
+            4 * mem::size_of::<f32>() as i32,
+            0,
+        );
+        vao.set_attribute(
+            1,
+            2,
+            gl::FLOAT,
+            gl::FALSE,
+            4 * mem::size_of::<f32>() as i32,
+            2 * mem::size_of::<f32>(),
+        );
         vao.unbind();
 
-        Ok(TextRenderer { font, px, shader, vao, _vbo: vbo })
+        // Approximate line metrics using a representative string with ascenders and descenders
+        let (line_ascent, line_descent) = {
+            let mut layout = Layout::new(CoordinateSystem::PositiveYDown);
+            layout.reset(&LayoutSettings::default());
+            // Include tall ascenders and deep descenders
+            let sample = "HITMWAgjpyq";
+            layout.append(&[&font], &TextStyle::new(sample, px, 0));
+            let mut min_y = f32::MAX;
+            let mut max_y = f32::MIN;
+            for g in layout.glyphs() {
+                min_y = min_y.min(g.y);
+                max_y = max_y.max(g.y + g.height as f32);
+            }
+            let ascent = (-min_y).max(0.0);
+            let descent = max_y.max(0.0);
+            (ascent, descent)
+        };
+
+        Ok(TextRenderer {
+            font,
+            px,
+            shader,
+            vao,
+            _vbo: vbo,
+            line_ascent,
+            line_descent,
+        })
     }
 
     pub fn set_projection(&self, projection: &Mat4) {
@@ -79,11 +122,15 @@ impl TextRenderer {
     }
 
     pub fn measure(&self, text: &str) -> Vec2 {
-        if text.is_empty() { return Vec2::ZERO; }
+        if text.is_empty() {
+            return Vec2::ZERO;
+        }
         let mut layout = Layout::new(CoordinateSystem::PositiveYDown);
         layout.reset(&LayoutSettings::default());
         layout.append(&[&self.font], &TextStyle::new(text, self.px, 0));
-        if layout.glyphs().is_empty() { return Vec2::ZERO; }
+        if layout.glyphs().is_empty() {
+            return Vec2::ZERO;
+        }
         let mut min_x = f32::MAX;
         let mut min_y = f32::MAX;
         let mut max_x = f32::MIN;
@@ -94,16 +141,45 @@ impl TextRenderer {
             max_x = max_x.max(g.x + g.width as f32);
             max_y = max_y.max(g.y + g.height as f32);
         }
-        Vec2::new((max_x - min_x).ceil().max(0.0), (max_y - min_y).ceil().max(0.0))
+        Vec2::new(
+            (max_x - min_x).ceil().max(0.0),
+            (max_y - min_y).ceil().max(0.0),
+        )
+    }
+
+    /// Returns the distance in pixels from the top of the rasterized bounds to the text baseline
+    pub fn baseline_offset(&self, text: &str) -> f32 {
+        if text.is_empty() {
+            return 0.0;
+        }
+        let mut layout = Layout::new(CoordinateSystem::PositiveYDown);
+        layout.reset(&LayoutSettings::default());
+        layout.append(&[&self.font], &TextStyle::new(text, self.px, 0));
+        let mut min_y = 0.0;
+        for g in layout.glyphs() {
+            if g.y < min_y {
+                min_y = g.y;
+            }
+        }
+        (-min_y).max(0.0)
+    }
+
+    /// Returns cached line metrics (ascent above baseline, descent below baseline)
+    pub fn line_metrics(&self) -> (f32, f32) {
+        (self.line_ascent, self.line_descent)
     }
 
     fn rasterize_rgba(&self, text: &str) -> (Vec<u8>, u32, u32) {
-        if text.is_empty() { return (vec![], 1, 1); }
+        if text.is_empty() {
+            return (vec![], 1, 1);
+        }
         let mut layout = Layout::new(CoordinateSystem::PositiveYDown);
         layout.reset(&LayoutSettings::default());
         layout.append(&[&self.font], &TextStyle::new(text, self.px, 0));
 
-        if layout.glyphs().is_empty() { return (vec![], 1, 1); }
+        if layout.glyphs().is_empty() {
+            return (vec![], 1, 1);
+        }
         let mut min_x = f32::MAX;
         let mut min_y = f32::MAX;
         let mut max_x = f32::MIN;
@@ -145,7 +221,9 @@ impl TextRenderer {
     }
 
     pub fn draw_text(&self, position: Vec2, color: Vec4, text: &str) {
-        if text.is_empty() { return; }
+        if text.is_empty() {
+            return;
+        }
         let (rgba, w, h) = self.rasterize_rgba(text);
         let tex = Texture::from_data(w, h, &rgba);
 
@@ -157,7 +235,9 @@ impl TextRenderer {
 
         self.vao.bind();
         tex.bind(0);
-        unsafe { gl::DrawArrays(gl::TRIANGLE_FAN, 0, 4); }
+        unsafe {
+            gl::DrawArrays(gl::TRIANGLE_FAN, 0, 4);
+        }
         tex.unbind();
         self.vao.unbind();
         // Texture drops automatically

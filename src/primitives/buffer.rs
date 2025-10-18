@@ -16,14 +16,14 @@ impl VertexBuffer {
         }
         VertexBuffer { id }
     }
-    
+
     /// Binds this buffer
     pub fn bind(&self) {
         unsafe {
             gl::BindBuffer(gl::ARRAY_BUFFER, self.id);
         }
     }
-    
+
     /// Uploads data to the buffer
     pub fn set_data<T>(&self, data: &[T], usage: GLenum) {
         self.bind();
@@ -36,7 +36,7 @@ impl VertexBuffer {
             );
         }
     }
-    
+
     /// Unbinds the buffer
     pub fn unbind(&self) {
         unsafe {
@@ -67,14 +67,14 @@ impl VertexArray {
         }
         VertexArray { id }
     }
-    
+
     /// Binds this vertex array
     pub fn bind(&self) {
         unsafe {
             gl::BindVertexArray(self.id);
         }
     }
-    
+
     /// Configures a vertex attribute
     pub fn set_attribute(
         &self,
@@ -98,7 +98,7 @@ impl VertexArray {
             );
         }
     }
-    
+
     /// Unbinds the vertex array
     pub fn unbind(&self) {
         unsafe {

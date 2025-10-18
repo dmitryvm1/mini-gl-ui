@@ -13,16 +13,16 @@ impl Shader {
         unsafe {
             // Compile vertex shader
             let vertex_shader = Self::compile_shader(vertex_src, gl::VERTEX_SHADER)?;
-            
+
             // Compile fragment shader
             let fragment_shader = Self::compile_shader(fragment_src, gl::FRAGMENT_SHADER)?;
-            
+
             // Link shaders into a program
             let program = gl::CreateProgram();
             gl::AttachShader(program, vertex_shader);
             gl::AttachShader(program, fragment_shader);
             gl::LinkProgram(program);
-            
+
             // Check for linking errors
             let mut success = 0;
             gl::GetProgramiv(program, gl::LINK_STATUS, &mut success);
@@ -39,22 +39,22 @@ impl Shader {
                 );
                 return Err(String::from_utf8_unchecked(buffer));
             }
-            
+
             // Clean up shaders (they're linked into the program now)
             gl::DeleteShader(vertex_shader);
             gl::DeleteShader(fragment_shader);
-            
+
             Ok(Shader { id: program })
         }
     }
-    
+
     /// Compiles a shader from source code
     unsafe fn compile_shader(src: &str, shader_type: GLenum) -> Result<GLuint, String> {
         let shader = gl::CreateShader(shader_type);
         let c_str = CString::new(src.as_bytes()).unwrap();
         gl::ShaderSource(shader, 1, &c_str.as_ptr(), ptr::null());
         gl::CompileShader(shader);
-        
+
         // Check for compilation errors
         let mut success = 0;
         gl::GetShaderiv(shader, gl::COMPILE_STATUS, &mut success);
@@ -71,17 +71,17 @@ impl Shader {
             );
             return Err(String::from_utf8_unchecked(buffer));
         }
-        
+
         Ok(shader)
     }
-    
+
     /// Activates this shader program
     pub fn use_program(&self) {
         unsafe {
             gl::UseProgram(self.id);
         }
     }
-    
+
     /// Sets a uniform mat4 value
     pub fn set_mat4(&self, name: &str, value: &glam::Mat4) {
         unsafe {
@@ -90,7 +90,7 @@ impl Shader {
             gl::UniformMatrix4fv(location, 1, gl::FALSE, value.as_ref().as_ptr());
         }
     }
-    
+
     /// Sets a uniform vec4 value
     pub fn set_vec4(&self, name: &str, value: &glam::Vec4) {
         unsafe {
@@ -99,7 +99,7 @@ impl Shader {
             gl::Uniform4f(location, value.x, value.y, value.z, value.w);
         }
     }
-    
+
     /// Sets a uniform vec2 value
     pub fn set_vec2(&self, name: &str, value: &glam::Vec2) {
         unsafe {
@@ -108,7 +108,7 @@ impl Shader {
             gl::Uniform2f(location, value.x, value.y);
         }
     }
-    
+
     /// Sets a uniform float value
     pub fn set_float(&self, name: &str, value: f32) {
         unsafe {
@@ -117,7 +117,7 @@ impl Shader {
             gl::Uniform1f(location, value);
         }
     }
-    
+
     /// Sets a uniform int value
     pub fn set_int(&self, name: &str, value: i32) {
         unsafe {

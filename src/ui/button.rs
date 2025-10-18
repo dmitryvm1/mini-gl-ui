@@ -1,6 +1,6 @@
 use crate::colors;
 use crate::renderer::QuadRenderer;
-use crate::ui::Widget;
+use crate::ui::{ButtonState, MouseButton, UiEvent, Widget, WidgetEvent};
 use glam::{Vec2, Vec4};
 
 /// A clickable button
@@ -11,6 +11,8 @@ pub struct Button {
     normal_color: Vec4,
     hover_color: Vec4,
     pressed_color: Vec4,
+    text_color: Vec4,
+    border_color: Vec4,
     is_hovered: bool,
     is_pressed: bool,
 }
@@ -22,42 +24,44 @@ impl Button {
             position,
             size,
             label,
-            normal_color: colors::LIGHT_GRAY,
-            hover_color: colors::GRAY,
-            pressed_color: colors::DARK_GRAY,
+            normal_color: translucent(colors::SURFACE_LIGHT, 0.8),
+            hover_color: translucent(colors::ACCENT_SOFT, 0.82),
+            pressed_color: translucent(colors::ACCENT, 0.88),
+            text_color: colors::TEXT_PRIMARY,
+            border_color: colors::BORDER_SOFT,
             is_hovered: false,
             is_pressed: false,
         }
     }
-    
+
     /// Sets the button colors
     pub fn with_colors(mut self, normal: Vec4, hover: Vec4, pressed: Vec4) -> Self {
-        self.normal_color = normal;
-        self.hover_color = hover;
-        self.pressed_color = pressed;
+        self.normal_color = translucent(normal, 0.8);
+        self.hover_color = translucent(hover, 0.82);
+        self.pressed_color = translucent(pressed, 0.88);
         self
     }
-    
+
     /// Gets the button label
     pub fn label(&self) -> &str {
         &self.label
     }
-    
+
     /// Sets hover state
     pub fn set_hovered(&mut self, hovered: bool) {
         self.is_hovered = hovered;
     }
-    
+
     /// Sets pressed state
     pub fn set_pressed(&mut self, pressed: bool) {
         self.is_pressed = pressed;
     }
-    
+
     /// Checks if button is pressed
     pub fn is_pressed(&self) -> bool {
         self.is_pressed
     }
-    
+
     /// Gets the current button color based on state
     fn current_color(&self) -> Vec4 {
         if self.is_pressed {
@@ -73,22 +77,89 @@ impl Button {
 impl Widget for Button {
     fn draw(&self, renderer: &QuadRenderer) {
         let color = self.current_color();
+        // Soft drop shadow keeps background subtly visible underneath
+        let shadow_offset = Vec2::new(2.0, 3.0);
+        renderer.draw_rect(self.position + shadow_offset, self.size, colors::SHADOW);
+
         renderer.draw_rect(self.position, self.size, color);
-        renderer.draw_rect_outline(self.position, self.size, colors::BLACK, 2.0);
+        let highlight_alpha = if self.is_pressed { 0.08 } else { 0.14 };
+        let highlight_height = (self.size.y * 0.45).max(1.0);
+        renderer.draw_rect(
+            self.position,
+            Vec2::new(self.size.x, highlight_height),
+            Vec4::new(1.0, 1.0, 1.0, highlight_alpha),
+        );
+
+        renderer.draw_rect_outline(self.position, self.size, self.border_color, 2.0);
+        if self.size.x > 4.0 && self.size.y > 4.0 {
+            renderer.draw_rect_outline(
+                self.position + Vec2::splat(2.0),
+                self.size - Vec2::splat(4.0),
+                colors::BORDER_SUBTLE,
+                1.0,
+            );
+        }
         // Centered text
         let text_size = renderer.measure_text(&self.label);
         let text_pos = Vec2::new(
             self.position.x + (self.size.x - text_size.x) * 0.5,
             self.position.y + (self.size.y - text_size.y) * 0.5,
         );
-        renderer.draw_text(text_pos, colors::BLACK, &self.label);
+        renderer.draw_text(text_pos, self.text_color, &self.label);
     }
-    
+
+    fn handle_event(&mut self, event: &UiEvent) -> Option<WidgetEvent> {
+        match event {
+            UiEvent::CursorMoved { position } => {
+                self.set_hovered(self.contains_point(*position));
+                None
+            }
+            UiEvent::MouseButton {
+                button,
+                state,
+                position,
+            } => {
+                if *button != MouseButton::Left {
+                    return None;
+                }
+                match state {
+                    ButtonState::Pressed => {
+                        if self.contains_point(*position) {
+                            self.set_pressed(true);
+                        }
+                        None
+                    }
+                    ButtonState::Released => {
+                        let was_pressed = self.is_pressed;
+                        self.set_pressed(false);
+                        if was_pressed && self.contains_point(*position) {
+                            Some(WidgetEvent::ButtonClicked {
+                                label: self.label.clone(),
+                            })
+                        } else {
+                            None
+                        }
+                    }
+                }
+            }
+            _ => None,
+        }
+    }
+
     fn position(&self) -> Vec2 {
         self.position
     }
-    
+
     fn size(&self) -> Vec2 {
         self.size
     }
+}
+
+fn translucent(color: Vec4, fallback_alpha: f32) -> Vec4 {
+    let alpha = if color.w <= 0.0 || color.w >= 0.99 {
+        fallback_alpha
+    } else {
+        color.w
+    };
+    Vec4::new(color.x, color.y, color.z, alpha.clamp(0.45, 0.95))
 }

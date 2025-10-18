@@ -16,13 +16,13 @@ impl Texture {
         unsafe {
             gl::GenTextures(1, &mut id);
             gl::BindTexture(gl::TEXTURE_2D, id);
-            
+
             // Set texture parameters
             gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_S, gl::CLAMP_TO_EDGE as i32);
             gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_WRAP_T, gl::CLAMP_TO_EDGE as i32);
             gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR as i32);
             gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MAG_FILTER, gl::LINEAR as i32);
-            
+
             // Allocate texture storage
             gl::TexImage2D(
                 gl::TEXTURE_2D,
@@ -35,20 +35,20 @@ impl Texture {
                 gl::UNSIGNED_BYTE,
                 ptr::null(),
             );
-            
+
             gl::BindTexture(gl::TEXTURE_2D, 0);
         }
-        
+
         Texture { id, width, height }
     }
-    
+
     /// Creates a texture from RGBA data
     pub fn from_data(width: u32, height: u32, data: &[u8]) -> Self {
         let texture = Self::new(width, height);
         texture.update_data(data);
         texture
     }
-    
+
     /// Updates the texture data
     pub fn update_data(&self, data: &[u8]) {
         unsafe {
@@ -67,7 +67,7 @@ impl Texture {
             gl::BindTexture(gl::TEXTURE_2D, 0);
         }
     }
-    
+
     /// Binds this texture to a texture unit
     pub fn bind(&self, unit: u32) {
         unsafe {
@@ -75,7 +75,7 @@ impl Texture {
             gl::BindTexture(gl::TEXTURE_2D, self.id);
         }
     }
-    
+
     /// Unbinds the texture
     pub fn unbind(&self) {
         unsafe {
