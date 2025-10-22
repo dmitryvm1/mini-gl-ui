@@ -103,6 +103,38 @@ impl Panel {
         )
     }
 
+    /// Sets the panel size
+    pub fn set_size(&mut self, size: Vec2) {
+        let min_height = self.title_bar_height + 4.0;
+        self.size = Vec2::new(size.x.max(0.0), size.y.max(min_height));
+        self.sync_children_positions();
+    }
+
+    /// Sets the panel title
+    pub fn set_title(&mut self, title: impl Into<String>) {
+        self.title = title.into();
+    }
+
+    /// Updates the panel colors
+    pub fn set_colors(&mut self, background: Vec4, title_bar: Vec4) {
+        self.background_color = translucent(background, 0.72);
+        self.title_bar_color = translucent(title_bar, 0.9);
+    }
+
+    /// Sets the border color
+    pub fn set_border_color(&mut self, color: Vec4) {
+        self.border_color = color;
+    }
+
+    /// Updates padding applied inside the panel content area
+    pub fn set_padding(&mut self, padding: Vec2) {
+        let new_padding = Vec2::new(padding.x.max(0.0), padding.y.max(0.0));
+        if self.content_padding != new_padding {
+            self.content_padding = new_padding;
+            self.sync_children_positions();
+        }
+    }
+
     /// Adds a child widget to the panel at the given offset from the content origin.
     pub fn add_child(&mut self, child: impl LayoutElement + 'static, offset: Vec2) {
         let mut child: Box<dyn LayoutElement> = Box::new(child);
@@ -112,6 +144,27 @@ impl Panel {
             widget: child,
             offset,
         });
+    }
+
+    /// Returns the number of child widgets.
+    pub fn len(&self) -> usize {
+        self.children.len()
+    }
+
+    /// Returns true when the panel has no children.
+    pub fn is_empty(&self) -> bool {
+        self.children.is_empty()
+    }
+
+    /// Removes the child at the provided index and returns it.
+    pub fn remove_child(&mut self, index: usize) -> Option<Box<dyn LayoutElement>> {
+        if index < self.children.len() {
+            let removed = self.children.remove(index);
+            self.sync_children_positions();
+            Some(removed.widget)
+        } else {
+            None
+        }
     }
 
     /// Adds a child widget to the panel using builder-style API.

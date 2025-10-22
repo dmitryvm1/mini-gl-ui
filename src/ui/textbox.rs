@@ -61,6 +61,16 @@ impl TextBox {
         self.position = position;
     }
 
+    /// Sets the textbox size
+    pub fn set_size(&mut self, size: Vec2) {
+        self.size = Vec2::new(size.x.max(0.0), size.y.max(0.0));
+    }
+
+    /// Sets the placeholder text
+    pub fn set_placeholder(&mut self, placeholder: impl Into<String>) {
+        self._placeholder = placeholder.into();
+    }
+
     /// Checks if the textbox is focused
     pub fn is_focused(&self) -> bool {
         self.is_focused

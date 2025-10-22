@@ -42,6 +42,16 @@ impl Checkbox {
         self.position = position;
     }
 
+    /// Sets the checkbox size
+    pub fn set_size(&mut self, size: Vec2) {
+        self.size = Vec2::new(size.x.max(0.0), size.y.max(0.0));
+    }
+
+    /// Sets the checkbox label
+    pub fn set_label(&mut self, label: impl Into<String>) {
+        self.label = label.into();
+    }
+
     /// Toggles the checkbox
     pub fn toggle(&mut self) {
         self.checked = !self.checked;

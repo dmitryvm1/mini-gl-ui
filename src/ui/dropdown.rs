@@ -92,6 +92,44 @@ impl Dropdown {
         self.position = position;
     }
 
+    /// Sets the dropdown size
+    pub fn set_size(&mut self, size: Vec2) {
+        self.size = Vec2::new(size.x.max(0.0), size.y.max(0.0));
+    }
+
+    /// Updates the placeholder text shown when no option is selected
+    pub fn set_placeholder(&mut self, placeholder: Option<String>) {
+        self.placeholder = placeholder;
+        if self.placeholder.is_some() {
+            self.selected_index = None;
+            self.scroll_offset = 0;
+        } else if self.selected_index.is_none() && !self.options.is_empty() {
+            self.selected_index = Some(0);
+        }
+        self.ensure_selected_visible();
+    }
+
+    /// Sets the maximum number of items visible before scrolling
+    pub fn set_max_visible_items(&mut self, count: usize) {
+        self.max_visible_items = count.max(1);
+        self.clamp_scroll();
+        self.ensure_selected_visible();
+    }
+
+    /// Sets the height for each option entry
+    pub fn set_option_height(&mut self, height: f32) {
+        self.option_height = height.max(8.0);
+    }
+
+    /// Opens or closes the dropdown
+    pub fn set_open(&mut self, open: bool) {
+        if open {
+            self.open();
+        } else {
+            self.close();
+        }
+    }
+
     fn visible_range(&self) -> (usize, usize) {
         if self.options.is_empty() {
             return (0, 0);

@@ -37,6 +37,11 @@ impl Label {
         self.color = color;
     }
 
+    /// Sets the label size
+    pub fn set_size(&mut self, size: Vec2) {
+        self.size = Vec2::new(size.x.max(0.0), size.y.max(0.0));
+    }
+
     /// Sets the label position
     pub fn set_position(&mut self, position: Vec2) {
         self.position = position;

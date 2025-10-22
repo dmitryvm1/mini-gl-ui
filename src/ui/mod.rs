@@ -6,6 +6,7 @@ mod dropdown;
 mod label;
 mod layout;
 mod panel;
+pub mod remote;
 mod textbox;
 
 pub use button::Button;
@@ -14,6 +15,10 @@ pub use dropdown::Dropdown;
 pub use label::Label;
 pub use layout::{CrossAlignment, HorizontalLayout, LayoutElement, VerticalLayout};
 pub use panel::Panel;
+pub use remote::{
+    RemoteCommand, RemoteCommandChannel, RemoteError, RemoteSessionReport, RemoteTransportError,
+    RemoteUiHost, RemoteUiSession,
+};
 pub use textbox::TextBox;
 
 use glam::Vec2;

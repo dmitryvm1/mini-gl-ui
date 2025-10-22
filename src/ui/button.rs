@@ -52,6 +52,33 @@ impl Button {
         self.position = position;
     }
 
+    /// Sets the button size
+    pub fn set_size(&mut self, size: Vec2) {
+        self.size = Vec2::new(size.x.max(0.0), size.y.max(0.0));
+    }
+
+    /// Sets the button label
+    pub fn set_label(&mut self, label: impl Into<String>) {
+        self.label = label.into();
+    }
+
+    /// Updates the button colors
+    pub fn set_colors(&mut self, normal: Vec4, hover: Vec4, pressed: Vec4) {
+        self.normal_color = translucent(normal, 0.8);
+        self.hover_color = translucent(hover, 0.82);
+        self.pressed_color = translucent(pressed, 0.88);
+    }
+
+    /// Sets the text color
+    pub fn set_text_color(&mut self, color: Vec4) {
+        self.text_color = color;
+    }
+
+    /// Sets the border color
+    pub fn set_border_color(&mut self, color: Vec4) {
+        self.border_color = color;
+    }
+
     /// Sets hover state
     pub fn set_hovered(&mut self, hovered: bool) {
         self.is_hovered = hovered;

@@ -1,4 +1,5 @@
 use mini_gl_ui::{colors, ui::*, Vec2};
+use serde_json::json;
 
 #[test]
 fn test_button_creation() {
@@ -480,4 +481,234 @@ fn vertical_layout_forwards_button_click() {
         Some(WidgetEvent::ButtonClicked { label }) => assert_eq!(label, "Action"),
         other => panic!("Unexpected event: {:?}", other),
     }
+}
+
+#[test]
+fn remote_commands_update_button() {
+    let channel = RemoteCommandChannel::new();
+    channel.push(RemoteCommand {
+        id: "primary".to_string(),
+        method: "set_position".to_string(),
+        params: json!({ "x": 48.0, "y": 64.0 }),
+    });
+    channel.push(RemoteCommand {
+        id: "primary".to_string(),
+        method: "set_size".to_string(),
+        params: json!({ "width": 140.0, "height": 36.0 }),
+    });
+    channel.push(RemoteCommand {
+        id: "primary".to_string(),
+        method: "set_label".to_string(),
+        params: json!({ "text": "Remote".to_string() }),
+    });
+
+    let mut button = Button::new(Vec2::ZERO, Vec2::new(80.0, 24.0), "Initial".to_string());
+
+    let report = RemoteUiSession::new(&channel)
+        .with_button("primary", &mut button)
+        .process();
+
+    assert!(
+        report.errors.is_empty(),
+        "unexpected remote errors: {:?}",
+        report.errors
+    );
+    assert_eq!(report.processed, 3);
+    assert_eq!(button.position(), Vec2::new(48.0, 64.0));
+    assert_eq!(button.size(), Vec2::new(140.0, 36.0));
+    assert_eq!(button.label(), "Remote");
+}
+
+#[test]
+fn remote_unknown_target_reports_error() {
+    let channel = RemoteCommandChannel::new();
+    channel.push(RemoteCommand {
+        id: "missing".to_string(),
+        method: "set_position".to_string(),
+        params: json!({ "x": 10.0, "y": 10.0 }),
+    });
+
+    let mut checkbox = Checkbox::new(Vec2::ZERO, Vec2::new(18.0, 18.0), "Check".to_string());
+    let report = RemoteUiSession::new(&channel)
+        .with_checkbox("existing", &mut checkbox)
+        .process();
+
+    assert_eq!(report.processed, 0);
+    assert_eq!(report.errors.len(), 1);
+    match &report.errors[0] {
+        RemoteError::UnknownTarget { id, method } => {
+            assert_eq!(id, "missing");
+            assert_eq!(method, "set_position");
+        }
+        other => panic!("unexpected error variant: {:?}", other),
+    }
+}
+
+#[test]
+fn remote_host_attaches_button_to_layout() {
+    let channel = RemoteCommandChannel::new();
+    let mut host = RemoteUiHost::new(channel.clone());
+
+    channel.push(RemoteCommand {
+        id: "layout".to_string(),
+        method: "create".to_string(),
+        params: json!({
+            "kind": "vertical_layout",
+            "position": { "x": 0.0, "y": 0.0 }
+        }),
+    });
+    channel.push(RemoteCommand {
+        id: "button".to_string(),
+        method: "create".to_string(),
+        params: json!({
+            "kind": "button",
+            "label": "Remote Button",
+            "size": { "width": 120.0, "height": 36.0 }
+        }),
+    });
+    let report = host.process();
+    assert!(report.errors.is_empty());
+    assert_eq!(report.processed, 2);
+
+    channel.push(RemoteCommand {
+        id: "layout".to_string(),
+        method: "attach_child".to_string(),
+        params: json!({ "child": "button" }),
+    });
+
+    let report = host.process();
+    assert!(report.errors.is_empty());
+    assert_eq!(report.processed, 1);
+    assert!(host.is_attached_to("button", "layout"));
+
+    let mut events = host.handle_event(&UiEvent::CursorMoved {
+        position: Vec2::new(12.0, 12.0),
+    });
+    events.extend(host.handle_event(&UiEvent::MouseButton {
+        button: MouseButton::Left,
+        state: ButtonState::Pressed,
+        position: Vec2::new(12.0, 12.0),
+    }));
+    events.extend(host.handle_event(&UiEvent::MouseButton {
+        button: MouseButton::Left,
+        state: ButtonState::Released,
+        position: Vec2::new(12.0, 12.0),
+    }));
+
+    assert!(
+        events.iter().any(|event| matches!(
+            event,
+            WidgetEvent::ButtonClicked { label } if label == "Remote Button"
+        )),
+        "attached button did not emit click event"
+    );
+}
+
+#[test]
+fn remote_updates_layout_parameters() {
+    let channel = RemoteCommandChannel::new();
+    channel.push(RemoteCommand {
+        id: "layout".to_string(),
+        method: "set_spacing".to_string(),
+        params: json!({ "value": 22.0 }),
+    });
+    channel.push(RemoteCommand {
+        id: "layout".to_string(),
+        method: "set_padding".to_string(),
+        params: json!({ "x": 12.0, "y": 16.0 }),
+    });
+    channel.push(RemoteCommand {
+        id: "layout".to_string(),
+        method: "set_cross_alignment".to_string(),
+        params: json!({ "alignment": "center" }),
+    });
+
+    let mut layout = HorizontalLayout::new(Vec2::ZERO);
+    layout.add_child(Label::new(
+        Vec2::ZERO,
+        Vec2::new(40.0, 16.0),
+        "L1".to_string(),
+        colors::BLUE,
+    ));
+
+    let report = RemoteUiSession::new(&channel)
+        .with_horizontal_layout("layout", &mut layout)
+        .process();
+
+    assert!(report.errors.is_empty());
+    assert_eq!(report.processed, 3);
+    assert_eq!(layout.len(), 1);
+    assert_eq!(layout.size().y > 0.0, true);
+}
+
+#[test]
+fn remote_host_creates_and_updates_widgets() {
+    let channel = RemoteCommandChannel::new();
+    let mut host = RemoteUiHost::new(channel.clone());
+
+    channel.push(RemoteCommand {
+        id: "title".to_string(),
+        method: "create".to_string(),
+        params: json!({
+            "kind": "label",
+            "text": "Remote UI",
+            "position": { "x": 12.0, "y": 18.0 }
+        }),
+    });
+    channel.push(RemoteCommand {
+        id: "title".to_string(),
+        method: "set_position".to_string(),
+        params: json!({ "x": 24.0, "y": 32.0 }),
+    });
+
+    let report = host.process();
+    assert!(
+        report.errors.is_empty(),
+        "unexpected errors: {:?}",
+        report.errors
+    );
+    assert_eq!(report.processed, 2);
+    assert!(host.contains("title"));
+    assert_eq!(host.len(), 1);
+
+    channel.push(RemoteCommand {
+        id: "title".to_string(),
+        method: "destroy".to_string(),
+        params: json!({}),
+    });
+
+    let report = host.process();
+    assert!(report.errors.is_empty());
+    assert_eq!(report.processed, 1);
+    assert!(!host.contains("title"));
+    assert_eq!(host.len(), 0);
+}
+
+#[test]
+fn remote_host_rejects_duplicate_ids() {
+    let channel = RemoteCommandChannel::new();
+    let mut host = RemoteUiHost::new(channel.clone());
+
+    channel.push(RemoteCommand {
+        id: "btn".to_string(),
+        method: "create".to_string(),
+        params: json!({ "kind": "button" }),
+    });
+    channel.push(RemoteCommand {
+        id: "btn".to_string(),
+        method: "create".to_string(),
+        params: json!({ "kind": "button" }),
+    });
+
+    let report = host.process();
+    assert_eq!(report.processed, 1);
+    assert_eq!(report.errors.len(), 1);
+    match &report.errors[0] {
+        RemoteError::AlreadyExists { id, method } => {
+            assert_eq!(id, "btn");
+            assert_eq!(method, "create");
+        }
+        other => panic!("unexpected error variant: {:?}", other),
+    }
+    assert!(host.contains("btn"));
 }

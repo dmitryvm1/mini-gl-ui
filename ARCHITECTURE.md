@@ -128,6 +128,19 @@ Each component manages its own state:
 - Content state (text, checked/unchecked)
 - Interaction state (dragging, cursor position)
 
+## Remote Control Interface (`src/ui/remote.rs`)
+
+The remote interface exposes a runtime control plane for manipulating widget state from
+external processes (IPC, sockets, etc.). It introduces four core pieces:
+
+- `RemoteCommandChannel`: a thread-safe queue that collects JSON commands, optionally populated by helper readers or TCP listeners.
+- `RemoteUiSession`: a per-tick adapter that binds widget references to identifiers and applies the queued commands.
+- `RemoteUiHost`: an owning registry that stores widgets, supports remote-driven creation/destruction, and surfaces draw/event APIs for applications that want a fully remote-controlled UI.
+- `attach_child` commands let the host move existing widgets into layouts or panels (with optional offsets), enabling remote composition of complex UI trees after initial creation.
+- `RemoteCommand`: a transport-friendly `{ id, method, params }` payload interpreted by widget-specific adapters.
+
+Widgets now expose explicit setters for position, size, text, colors, and other stateful attributes so that the remote executor can mutate them without relying on private fields. Layout containers and panels expose additional setters (`set_spacing`, `set_padding`, `set_cross_alignment`, etc.) enabling remote layout tweaks alongside standard widget updates. The host handles creation via `method: "create"` commands (for buttons, labels, layouts, panels, etc.) and ensures the draw order stays deterministic.
+
 ## Data Flow
 
 ### Rendering Flow
