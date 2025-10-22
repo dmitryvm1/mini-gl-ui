@@ -37,6 +37,11 @@ impl Checkbox {
         self.checked = checked;
     }
 
+    /// Sets the checkbox position
+    pub fn set_position(&mut self, position: Vec2) {
+        self.position = position;
+    }
+
     /// Toggles the checkbox
     pub fn toggle(&mut self) {
         self.checked = !self.checked;
@@ -125,5 +130,19 @@ impl Widget for Checkbox {
 
     fn size(&self) -> Vec2 {
         self.size
+    }
+}
+
+impl crate::ui::LayoutElement for Checkbox {
+    fn set_position(&mut self, position: Vec2) {
+        self.set_position(position);
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
     }
 }

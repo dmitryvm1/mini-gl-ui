@@ -2,13 +2,17 @@
 
 mod button;
 mod checkbox;
+mod dropdown;
 mod label;
+mod layout;
 mod panel;
 mod textbox;
 
 pub use button::Button;
 pub use checkbox::Checkbox;
+pub use dropdown::Dropdown;
 pub use label::Label;
+pub use layout::{CrossAlignment, HorizontalLayout, LayoutElement, VerticalLayout};
 pub use panel::Panel;
 pub use textbox::TextBox;
 
@@ -47,6 +51,10 @@ pub enum UiEvent {
         state: ButtonState,
         position: Vec2,
     },
+    Scroll {
+        delta: f32,
+        position: Vec2,
+    },
     CharacterInput(char),
     KeyInput {
         key: KeyCode,
@@ -60,6 +68,7 @@ pub enum WidgetEvent {
     CheckboxToggled { label: String, checked: bool },
     TextChanged { text: String },
     TextBoxFocusChanged { focused: bool },
+    DropdownSelectionChanged { id: String, selected: String },
     PanelDragStarted,
     PanelDragged { position: Vec2 },
     PanelDragEnded,

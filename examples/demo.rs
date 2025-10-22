@@ -5,8 +5,9 @@ use mini_gl_ui::{
     primitives::Texture,
     renderer::QuadRenderer,
     ui::{
-        Button, ButtonState as UiButtonState, Checkbox, KeyCode as UiKeyCode, Label,
-        MouseButton as UiMouseButton, Panel, TextBox, UiEvent, Widget, WidgetEvent,
+        Button, ButtonState as UiButtonState, Checkbox, CrossAlignment, Dropdown, HorizontalLayout,
+        KeyCode as UiKeyCode, Label, MouseButton as UiMouseButton, Panel, TextBox, UiEvent,
+        VerticalLayout, Widget, WidgetEvent,
     },
     Vec2, Vec4,
 };
@@ -593,6 +594,7 @@ fn main() {
     window.set_char_polling(true);
     window.set_mouse_button_polling(true);
     window.set_cursor_pos_polling(true);
+    window.set_scroll_polling(true);
     window.make_current();
 
     // Load OpenGL function pointers
@@ -629,7 +631,7 @@ fn main() {
     let mut label = Label::new(
         Vec2::new(50.0, 50.0),
         Vec2::new(200.0, 40.0),
-        "Label".to_string(),
+        "Label \n multiline".to_string(),
         colors::ACCENT_SOFT,
     );
 
@@ -651,6 +653,24 @@ fn main() {
         "Enter text...".to_string(),
     );
 
+    let mut dropdown = Dropdown::new(
+        Vec2::new(50.0, 280.0),
+        Vec2::new(220.0, 36.0),
+        "class_select".to_string(),
+        vec![
+            "Warrior".to_string(),
+            "Mage".to_string(),
+            "Rogue".to_string(),
+            "Cleric".to_string(),
+            "Ranger".to_string(),
+            "Paladin".to_string(),
+            "Bard".to_string(),
+            "Druid".to_string(),
+        ],
+    )
+    .with_placeholder("Choose a class".to_string())
+    .with_max_visible_items(4);
+
     let mut panel = Panel::new(
         Vec2::new(300.0, 50.0),
         Vec2::new(400.0, 300.0),
@@ -658,9 +678,40 @@ fn main() {
     )
     .with_colors(colors::SURFACE_DARK, colors::ACCENT);
 
+    let mut action_row = HorizontalLayout::new(Vec2::ZERO).with_spacing(12.0);
+    action_row.add_child(Button::new(
+        Vec2::ZERO,
+        Vec2::new(120.0, 36.0),
+        "Accept".to_string(),
+    ));
+    action_row.add_child(Button::new(
+        Vec2::ZERO,
+        Vec2::new(120.0, 36.0),
+        "Decline".to_string(),
+    ));
+
+    let mut layout_section = VerticalLayout::new(Vec2::new(320.0, 380.0))
+        .with_spacing(14.0)
+        .with_cross_alignment(CrossAlignment::Center);
+    layout_section.add_child(Label::new(
+        Vec2::ZERO,
+        Vec2::new(260.0, 32.0),
+        "Party Actions".to_string(),
+        colors::ACCENT_SOFT,
+    ));
+    layout_section.add_child(action_row);
+    layout_section.add_child(Checkbox::new(
+        Vec2::ZERO,
+        Vec2::new(26.0, 26.0),
+        "Remember choice".to_string(),
+    ));
+
     let background_texture = create_mmo_background_texture(WINDOW_WIDTH, WINDOW_HEIGHT);
 
     let mut mouse_pos = Vec2::ZERO;
+    let mut typed_text = String::new();
+    let mut selected_class = dropdown.selected().unwrap_or("None").to_string();
+    label.set_text(format!("Text: {} Class: {}", typed_text, selected_class));
 
     // Main loop
     while !window.should_close() {
@@ -680,7 +731,9 @@ fn main() {
                             &mut button,
                             &mut checkbox,
                             &mut textbox,
+                            &mut dropdown,
                             &mut panel,
+                            &mut layout_section,
                         ],
                         &ui_event,
                     );
@@ -703,11 +756,31 @@ fn main() {
                                 &mut button,
                                 &mut checkbox,
                                 &mut textbox,
+                                &mut dropdown,
                                 &mut panel,
+                                &mut layout_section,
                             ],
                             &ui_event,
                         );
                     }
+                }
+                glfw::WindowEvent::Scroll(_, y) => {
+                    let ui_event = UiEvent::Scroll {
+                        delta: y as f32,
+                        position: mouse_pos,
+                    };
+                    emitted_events = dispatch_ui_event(
+                        vec![
+                            &mut label,
+                            &mut button,
+                            &mut checkbox,
+                            &mut textbox,
+                            &mut dropdown,
+                            &mut panel,
+                            &mut layout_section,
+                        ],
+                        &ui_event,
+                    );
                 }
                 glfw::WindowEvent::Char(character) => {
                     let ui_event = UiEvent::CharacterInput(character);
@@ -717,7 +790,9 @@ fn main() {
                             &mut button,
                             &mut checkbox,
                             &mut textbox,
+                            &mut dropdown,
                             &mut panel,
+                            &mut layout_section,
                         ],
                         &ui_event,
                     );
@@ -726,7 +801,7 @@ fn main() {
                     if key == Key::Escape && action == Action::Press {
                         window.set_should_close(true);
                     }
-                    if action == Action::Press {
+                    if matches!(action, Action::Press | Action::Repeat) {
                         let keycode = match key {
                             Key::Backspace => Some(UiKeyCode::Backspace),
                             _ => None,
@@ -739,7 +814,9 @@ fn main() {
                                     &mut button,
                                     &mut checkbox,
                                     &mut textbox,
+                                    &mut dropdown,
                                     &mut panel,
+                                    &mut layout_section,
                                 ],
                                 &ui_event,
                             );
@@ -763,10 +840,16 @@ fn main() {
                         println!("Checkbox '{checkbox_label}' is now: {checked}");
                     }
                     WidgetEvent::TextChanged { text } => {
-                        label.set_text(format!("Text: {text}"));
+                        typed_text = text;
+                        label.set_text(format!("Text: {} | Class: {}", typed_text, selected_class));
                     }
                     WidgetEvent::TextBoxFocusChanged { focused } => {
                         println!("TextBox {}", if focused { "focused" } else { "unfocused" });
+                    }
+                    WidgetEvent::DropdownSelectionChanged { id, selected } => {
+                        selected_class = selected;
+                        label.set_text(format!("Text: {} | Class: {}", typed_text, selected_class));
+                        println!("Dropdown '{id}' selected '{selected_class}'");
                     }
                     WidgetEvent::PanelDragStarted => println!("Started dragging panel"),
                     WidgetEvent::PanelDragged { .. } => {}
@@ -791,7 +874,15 @@ fn main() {
 
         // Draw UI components
         draw_widgets(
-            vec![&label, &button, &checkbox, &textbox, &panel],
+            vec![
+                &label,
+                &button,
+                &checkbox,
+                &textbox,
+                &dropdown,
+                &panel,
+                &layout_section,
+            ],
             &renderer,
         );
 

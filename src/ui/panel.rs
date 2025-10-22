@@ -182,6 +182,20 @@ impl Widget for Panel {
     }
 }
 
+impl crate::ui::LayoutElement for Panel {
+    fn set_position(&mut self, position: Vec2) {
+        self.set_position(position);
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+}
+
 fn translucent(color: Vec4, fallback_alpha: f32) -> Vec4 {
     let alpha = if color.w <= 0.0 || color.w >= 0.99 {
         fallback_alpha

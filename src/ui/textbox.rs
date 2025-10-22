@@ -56,6 +56,11 @@ impl TextBox {
         self.is_focused = focused;
     }
 
+    /// Sets the textbox position
+    pub fn set_position(&mut self, position: Vec2) {
+        self.position = position;
+    }
+
     /// Checks if the textbox is focused
     pub fn is_focused(&self) -> bool {
         self.is_focused
@@ -173,6 +178,20 @@ impl Widget for TextBox {
 
     fn size(&self) -> Vec2 {
         self.size
+    }
+}
+
+impl crate::ui::LayoutElement for TextBox {
+    fn set_position(&mut self, position: Vec2) {
+        self.set_position(position);
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
     }
 }
 

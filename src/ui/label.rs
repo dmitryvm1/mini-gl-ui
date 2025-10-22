@@ -36,6 +36,11 @@ impl Label {
     pub fn set_color(&mut self, color: Vec4) {
         self.color = color;
     }
+
+    /// Sets the label position
+    pub fn set_position(&mut self, position: Vec2) {
+        self.position = position;
+    }
 }
 
 impl Widget for Label {
@@ -71,6 +76,20 @@ impl Widget for Label {
 
     fn size(&self) -> Vec2 {
         self.size
+    }
+}
+
+impl crate::ui::LayoutElement for Label {
+    fn set_position(&mut self, position: Vec2) {
+        self.set_position(position);
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
     }
 }
 

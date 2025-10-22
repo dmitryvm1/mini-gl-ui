@@ -47,6 +47,11 @@ impl Button {
         &self.label
     }
 
+    /// Sets the button position
+    pub fn set_position(&mut self, position: Vec2) {
+        self.position = position;
+    }
+
     /// Sets hover state
     pub fn set_hovered(&mut self, hovered: bool) {
         self.is_hovered = hovered;
@@ -152,6 +157,20 @@ impl Widget for Button {
 
     fn size(&self) -> Vec2 {
         self.size
+    }
+}
+
+impl crate::ui::LayoutElement for Button {
+    fn set_position(&mut self, position: Vec2) {
+        self.set_position(position);
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
     }
 }
 

@@ -216,6 +216,110 @@ fn test_textbox_handle_event_updates_text() {
 }
 
 #[test]
+fn test_textbox_repeated_backspace_events() {
+    let mut textbox = TextBox::new(
+        Vec2::new(0.0, 0.0),
+        Vec2::new(200.0, 30.0),
+        "Placeholder".to_string(),
+    );
+
+    textbox.set_focused(true);
+    textbox.handle_event(&UiEvent::CharacterInput('A'));
+    textbox.handle_event(&UiEvent::CharacterInput('B'));
+    assert_eq!(textbox.text(), "AB");
+
+    textbox.handle_event(&UiEvent::KeyInput {
+        key: KeyCode::Backspace,
+    });
+    assert_eq!(textbox.text(), "A");
+
+    textbox.handle_event(&UiEvent::KeyInput {
+        key: KeyCode::Backspace,
+    });
+    assert_eq!(textbox.text(), "");
+}
+
+#[test]
+fn test_dropdown_selects_option() {
+    let mut dropdown = Dropdown::new(
+        Vec2::new(0.0, 0.0),
+        Vec2::new(160.0, 32.0),
+        "dropdown".to_string(),
+        vec!["One".to_string(), "Two".to_string(), "Three".to_string()],
+    )
+    .with_placeholder("Pick one".to_string());
+
+    assert!(dropdown.selected().is_none());
+    assert!(!dropdown.is_open());
+
+    dropdown.handle_event(&UiEvent::MouseButton {
+        button: MouseButton::Left,
+        state: ButtonState::Pressed,
+        position: Vec2::new(10.0, 10.0),
+    });
+    assert!(dropdown.is_open());
+
+    let selection_event = dropdown.handle_event(&UiEvent::MouseButton {
+        button: MouseButton::Left,
+        state: ButtonState::Pressed,
+        position: Vec2::new(10.0, dropdown.size().y + 28.0 + 10.0),
+    });
+    assert!(!dropdown.is_open());
+    assert_eq!(dropdown.selected(), Some("Two"));
+
+    match selection_event {
+        Some(WidgetEvent::DropdownSelectionChanged { id, selected }) => {
+            assert_eq!(id, "dropdown");
+            assert_eq!(selected, "Two");
+        }
+        other => panic!("Unexpected event: {:?}", other),
+    }
+}
+
+#[test]
+fn test_dropdown_scroll_and_select_lower_option() {
+    let mut dropdown = Dropdown::new(
+        Vec2::new(0.0, 0.0),
+        Vec2::new(160.0, 32.0),
+        "dropdown".to_string(),
+        (1..=6).map(|i| format!("Option {i}")).collect(),
+    )
+    .with_placeholder("Pick one".to_string())
+    .with_max_visible_items(3);
+
+    dropdown.handle_event(&UiEvent::MouseButton {
+        button: MouseButton::Left,
+        state: ButtonState::Pressed,
+        position: Vec2::new(10.0, 10.0),
+    });
+    assert!(dropdown.is_open());
+
+    let list_point = Vec2::new(10.0, dropdown.size().y + 5.0);
+    dropdown.handle_event(&UiEvent::Scroll {
+        delta: -1.0,
+        position: list_point,
+    });
+    dropdown.handle_event(&UiEvent::Scroll {
+        delta: -1.0,
+        position: list_point,
+    });
+
+    let selection_event = dropdown.handle_event(&UiEvent::MouseButton {
+        button: MouseButton::Left,
+        state: ButtonState::Pressed,
+        position: Vec2::new(10.0, dropdown.size().y + 2.0 * 28.0 + 14.0),
+    });
+    assert_eq!(dropdown.selected(), Some("Option 5"));
+
+    match selection_event {
+        Some(WidgetEvent::DropdownSelectionChanged { selected, .. }) => {
+            assert_eq!(selected, "Option 5");
+        }
+        other => panic!("Unexpected event: {:?}", other),
+    }
+}
+
+#[test]
 fn test_panel_handle_event_drag_flow() {
     let mut panel = Panel::new(
         Vec2::new(100.0, 100.0),
@@ -245,4 +349,65 @@ fn test_panel_handle_event_drag_flow() {
         position: Vec2::new(200.0, 160.0),
     });
     assert!(matches!(stop_event, Some(WidgetEvent::PanelDragEnded)));
+}
+
+#[test]
+fn horizontal_layout_positions_children() {
+    let mut layout = HorizontalLayout::new(Vec2::new(10.0, 20.0))
+        .with_padding(Vec2::new(4.0, 6.0))
+        .with_spacing(5.0)
+        .with_cross_alignment(CrossAlignment::Center);
+
+    layout.add_child(Label::new(
+        Vec2::ZERO,
+        Vec2::new(40.0, 16.0),
+        "Label".to_string(),
+        colors::BLUE,
+    ));
+    layout.add_child(Button::new(
+        Vec2::ZERO,
+        Vec2::new(24.0, 30.0),
+        "Btn".to_string(),
+    ));
+
+    let first = layout.child(0).expect("layout should have first child");
+    let second = layout.child(1).expect("layout should have second child");
+
+    assert_eq!(first.position(), Vec2::new(14.0, 33.0));
+    assert_eq!(second.position(), Vec2::new(59.0, 26.0));
+    assert_eq!(layout.size(), Vec2::new(77.0, 42.0));
+}
+
+#[test]
+fn vertical_layout_forwards_button_click() {
+    let mut layout = VerticalLayout::new(Vec2::ZERO).with_spacing(4.0);
+
+    layout.add_child(Checkbox::new(
+        Vec2::ZERO,
+        Vec2::new(20.0, 20.0),
+        "Check".to_string(),
+    ));
+    layout.add_child(Button::new(
+        Vec2::ZERO,
+        Vec2::new(80.0, 24.0),
+        "Action".to_string(),
+    ));
+
+    let click_point = Vec2::new(18.0, 44.0);
+    layout.handle_event(&UiEvent::MouseButton {
+        button: MouseButton::Left,
+        state: ButtonState::Pressed,
+        position: click_point,
+    });
+
+    let release_event = layout.handle_event(&UiEvent::MouseButton {
+        button: MouseButton::Left,
+        state: ButtonState::Released,
+        position: click_point,
+    });
+
+    match release_event {
+        Some(WidgetEvent::ButtonClicked { label }) => assert_eq!(label, "Action"),
+        other => panic!("Unexpected event: {:?}", other),
+    }
 }
