@@ -352,6 +352,76 @@ fn test_panel_handle_event_drag_flow() {
 }
 
 #[test]
+fn panel_child_receives_events() {
+    let mut panel = Panel::new(
+        Vec2::new(80.0, 80.0),
+        Vec2::new(260.0, 200.0),
+        "Panel".to_string(),
+    );
+    panel.add_child(
+        Button::new(
+            Vec2::ZERO,
+            Vec2::new(120.0, 36.0),
+            "Inner Action".to_string(),
+        ),
+        Vec2::new(24.0, 32.0),
+    );
+
+    let child_position = panel.child(0).expect("panel should have child").position();
+    let click_point = Vec2::new(child_position.x + 6.0, child_position.y + 8.0);
+
+    panel.handle_event(&UiEvent::CursorMoved {
+        position: click_point,
+    });
+
+    panel.handle_event(&UiEvent::MouseButton {
+        button: MouseButton::Left,
+        state: ButtonState::Pressed,
+        position: click_point,
+    });
+
+    let release_event = panel.handle_event(&UiEvent::MouseButton {
+        button: MouseButton::Left,
+        state: ButtonState::Released,
+        position: click_point,
+    });
+
+    match release_event {
+        Some(WidgetEvent::ButtonClicked { label }) => assert_eq!(label, "Inner Action"),
+        other => panic!("Unexpected event: {:?}", other),
+    }
+}
+
+#[test]
+fn panel_drag_moves_children() {
+    let mut panel = Panel::new(
+        Vec2::new(120.0, 90.0),
+        Vec2::new(240.0, 180.0),
+        "Panel".to_string(),
+    );
+    panel.add_child(
+        Label::new(
+            Vec2::ZERO,
+            Vec2::new(60.0, 18.0),
+            "Inside".to_string(),
+            colors::ACCENT_SOFT,
+        ),
+        Vec2::new(18.0, 24.0),
+    );
+
+    let initial_child_pos = panel.child(0).expect("panel should have child").position();
+
+    let drag_start = Vec2::new(panel.position().x + 10.0, panel.position().y + 10.0);
+    panel.start_drag(drag_start);
+    panel.update_drag(drag_start + Vec2::new(45.0, 55.0));
+    panel.stop_drag();
+
+    let moved_child_pos = panel.child(0).expect("panel should have child").position();
+
+    assert_eq!(moved_child_pos, initial_child_pos + Vec2::new(45.0, 55.0));
+}
+
+#[test]
 fn horizontal_layout_positions_children() {
     let mut layout = HorizontalLayout::new(Vec2::new(10.0, 20.0))
         .with_padding(Vec2::new(4.0, 6.0))

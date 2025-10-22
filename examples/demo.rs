@@ -676,7 +676,49 @@ fn main() {
         Vec2::new(400.0, 300.0),
         "Draggable Panel".to_string(),
     )
-    .with_colors(colors::SURFACE_DARK, colors::ACCENT);
+    .with_colors(colors::SURFACE_DARK, colors::ACCENT)
+    .with_padding(Vec2::new(18.0, 16.0));
+
+    let mut panel_controls_row = HorizontalLayout::new(Vec2::ZERO).with_spacing(12.0);
+    panel_controls_row.add_child(Button::new(
+        Vec2::ZERO,
+        Vec2::new(120.0, 34.0),
+        "Apply Buff".to_string(),
+    ));
+    panel_controls_row.add_child(Button::new(
+        Vec2::ZERO,
+        Vec2::new(120.0, 34.0),
+        "Clear Buff".to_string(),
+    ));
+
+    let mut panel_layout = VerticalLayout::new(Vec2::ZERO)
+        .with_spacing(12.0)
+        .with_cross_alignment(CrossAlignment::Start);
+    panel_layout.add_child(Label::new(
+        Vec2::ZERO,
+        Vec2::new(260.0, 28.0),
+        "Raid Controls".to_string(),
+        colors::ACCENT_SOFT,
+    ));
+    panel_layout.add_child(Label::new(
+        Vec2::ZERO,
+        Vec2::new(300.0, 24.0),
+        "Toggle quick options directly inside the panel:".to_string(),
+        colors::TEXT_SECONDARY,
+    ));
+    panel_layout.add_child(Checkbox::new(
+        Vec2::ZERO,
+        Vec2::new(26.0, 26.0),
+        "Enable overlay markers".to_string(),
+    ));
+    panel_layout.add_child(Checkbox::new(
+        Vec2::ZERO,
+        Vec2::new(26.0, 26.0),
+        "Lock panel position".to_string(),
+    ));
+    panel_layout.add_child(panel_controls_row);
+
+    panel.add_child(panel_layout, Vec2::ZERO);
 
     let mut action_row = HorizontalLayout::new(Vec2::ZERO).with_spacing(12.0);
     action_row.add_child(Button::new(

@@ -1,6 +1,6 @@
 use crate::colors;
 use crate::renderer::QuadRenderer;
-use crate::ui::{ButtonState, MouseButton, UiEvent, Widget, WidgetEvent};
+use crate::ui::{ButtonState, LayoutElement, MouseButton, UiEvent, Widget, WidgetEvent};
 use glam::{Vec2, Vec4};
 
 /// A draggable panel that can contain other widgets
@@ -14,6 +14,8 @@ pub struct Panel {
     border_color: Vec4,
     is_dragging: bool,
     drag_offset: Vec2,
+    content_padding: Vec2,
+    children: Vec<PanelChild>,
 }
 
 impl Panel {
@@ -29,6 +31,8 @@ impl Panel {
             border_color: colors::BORDER_SOFT,
             is_dragging: false,
             drag_offset: Vec2::ZERO,
+            content_padding: Vec2::splat(12.0),
+            children: Vec::new(),
         }
     }
 
@@ -36,6 +40,13 @@ impl Panel {
     pub fn with_colors(mut self, background: Vec4, title_bar: Vec4) -> Self {
         self.background_color = translucent(background, 0.72);
         self.title_bar_color = translucent(title_bar, 0.9);
+        self
+    }
+
+    /// Sets padding applied inside the panel content area.
+    pub fn with_padding(mut self, padding: Vec2) -> Self {
+        self.content_padding = Vec2::new(padding.x.max(0.0), padding.y.max(0.0));
+        self.sync_children_positions();
         self
     }
 
@@ -62,6 +73,7 @@ impl Panel {
     pub fn update_drag(&mut self, mouse_pos: Vec2) {
         if self.is_dragging {
             self.position = mouse_pos - self.drag_offset;
+            self.sync_children_positions();
         }
     }
 
@@ -77,7 +89,73 @@ impl Panel {
 
     /// Sets the panel position
     pub fn set_position(&mut self, position: Vec2) {
-        self.position = position;
+        if self.position != position {
+            self.position = position;
+            self.sync_children_positions();
+        }
+    }
+
+    /// Returns the top-left position of the panel content area.
+    pub fn content_origin(&self) -> Vec2 {
+        Vec2::new(
+            self.position.x + self.content_padding.x,
+            self.position.y + self.title_bar_height + self.content_padding.y,
+        )
+    }
+
+    /// Adds a child widget to the panel at the given offset from the content origin.
+    pub fn add_child(&mut self, child: impl LayoutElement + 'static, offset: Vec2) {
+        let mut child: Box<dyn LayoutElement> = Box::new(child);
+        let offset = Vec2::new(offset.x, offset.y);
+        child.set_position(self.content_origin() + offset);
+        self.children.push(PanelChild {
+            widget: child,
+            offset,
+        });
+    }
+
+    /// Adds a child widget to the panel using builder-style API.
+    pub fn with_child(mut self, child: impl LayoutElement + 'static, offset: Vec2) -> Self {
+        self.add_child(child, offset);
+        self
+    }
+
+    /// Removes all child widgets from the panel.
+    pub fn clear_children(&mut self) {
+        if !self.children.is_empty() {
+            self.children.clear();
+        }
+    }
+
+    /// Returns an immutable reference to a child by index.
+    pub fn child(&self, index: usize) -> Option<&dyn LayoutElement> {
+        self.children.get(index).map(|child| child.widget.as_ref())
+    }
+
+    /// Returns a mutable reference to a child by index.
+    pub fn child_mut(&mut self, index: usize) -> Option<&mut dyn LayoutElement> {
+        self.children
+            .get_mut(index)
+            .map(|child| child.widget.as_mut())
+    }
+
+    fn sync_children_positions(&mut self) {
+        if self.children.is_empty() {
+            return;
+        }
+        let origin = self.content_origin();
+        for child in &mut self.children {
+            child.widget.set_position(origin + child.offset);
+        }
+    }
+
+    fn dispatch_event_to_children(&mut self, event: &UiEvent) -> Option<WidgetEvent> {
+        for child in self.children.iter_mut().rev() {
+            if let Some(widget_event) = child.widget.handle_event(event) {
+                return Some(widget_event);
+            }
+        }
+        None
     }
 }
 
@@ -113,6 +191,16 @@ impl Widget for Panel {
             Vec4::new(1.0, 1.0, 1.0, 0.06),
         );
 
+        // Draw line separating title bar from content
+        let separator_pos = Vec2::new(self.position.x, self.position.y + self.title_bar_height);
+        let separator_size = Vec2::new(self.size.x, 2.0);
+        renderer.draw_rect(separator_pos, separator_size, colors::BORDER_SOFT);
+
+        // Draw child widgets
+        for child in &self.children {
+            child.widget.draw(renderer);
+        }
+
         // Draw border around the entire panel
         renderer.draw_rect_outline(self.position, self.size, self.border_color, 2.0);
         if self.size.x > 6.0 && self.size.y > 6.0 {
@@ -123,11 +211,6 @@ impl Widget for Panel {
                 1.0,
             );
         }
-
-        // Draw line separating title bar from content
-        let separator_pos = Vec2::new(self.position.x, self.position.y + self.title_bar_height);
-        let separator_size = Vec2::new(self.size.x, 2.0);
-        renderer.draw_rect(separator_pos, separator_size, colors::BORDER_SOFT);
     }
 
     fn handle_event(&mut self, event: &UiEvent) -> Option<WidgetEvent> {
@@ -135,12 +218,11 @@ impl Widget for Panel {
             UiEvent::CursorMoved { position } => {
                 if self.is_dragging {
                     self.update_drag(*position);
-                    Some(WidgetEvent::PanelDragged {
+                    return Some(WidgetEvent::PanelDragged {
                         position: self.position,
-                    })
-                } else {
-                    None
+                    });
                 }
+                self.dispatch_event_to_children(event)
             }
             UiEvent::MouseButton {
                 button,
@@ -148,7 +230,7 @@ impl Widget for Panel {
                 position,
             } => {
                 if *button != MouseButton::Left {
-                    return None;
+                    return self.dispatch_event_to_children(event);
                 }
                 match state {
                     ButtonState::Pressed => {
@@ -156,20 +238,21 @@ impl Widget for Panel {
                             self.start_drag(*position);
                             Some(WidgetEvent::PanelDragStarted)
                         } else {
-                            None
+                            self.dispatch_event_to_children(event)
                         }
                     }
                     ButtonState::Released => {
+                        let child_event = self.dispatch_event_to_children(event);
                         if self.is_dragging {
                             self.stop_drag();
-                            Some(WidgetEvent::PanelDragEnded)
+                            child_event.or(Some(WidgetEvent::PanelDragEnded))
                         } else {
-                            None
+                            child_event
                         }
                     }
                 }
             }
-            _ => None,
+            _ => self.dispatch_event_to_children(event),
         }
     }
 
@@ -203,4 +286,9 @@ fn translucent(color: Vec4, fallback_alpha: f32) -> Vec4 {
         color.w
     };
     Vec4::new(color.x, color.y, color.z, alpha.clamp(0.45, 0.92))
+}
+
+struct PanelChild {
+    widget: Box<dyn LayoutElement>,
+    offset: Vec2,
 }
