@@ -10,7 +10,7 @@ pub struct TextRenderer {
     shader: Shader,
     vao: VertexArray,
     _vbo: VertexBuffer,
-    // Cached line metrics approximated from representative glyphs
+    // Cached line metrics (baseline ascent and descent in pixels)
     line_ascent: f32,
     line_descent: f32,
 }
@@ -86,22 +86,28 @@ impl TextRenderer {
         );
         vao.unbind();
 
-        // Approximate line metrics using a representative string with ascenders and descenders
-        let (line_ascent, line_descent) = {
+        // Cache line metrics so widgets can align text consistently regardless of glyph mix.
+        let (line_ascent, line_descent) = if let Some(metrics) = font.horizontal_line_metrics(px) {
+            let ascent = metrics.ascent.max(0.0);
+            let descent = (-metrics.descent).max(0.0);
+            (ascent, descent.max(0.0))
+        } else {
+            // Fallback to sampling a string with tall ascenders and deep descenders.
             let mut layout = Layout::new(CoordinateSystem::PositiveYDown);
             layout.reset(&LayoutSettings::default());
-            // Include tall ascenders and deep descenders
             let sample = "HITMWAgjpyq";
             layout.append(&[&font], &TextStyle::new(sample, px, 0));
-            let mut min_y = f32::MAX;
-            let mut max_y = f32::MIN;
-            for g in layout.glyphs() {
-                min_y = min_y.min(g.y);
-                max_y = max_y.max(g.y + g.height as f32);
+            if let Some(lines) = layout.lines() {
+                if let Some(line) = lines.first() {
+                    let ascent = line.max_ascent.max(0.0);
+                    let descent = (-line.min_descent).max(0.0);
+                    (ascent, descent)
+                } else {
+                    (px, px * 0.2)
+                }
+            } else {
+                (px, px * 0.2)
             }
-            let ascent = (-min_y).max(0.0);
-            let descent = max_y.max(0.0);
-            (ascent, descent)
         };
 
         Ok(TextRenderer {
@@ -128,40 +134,62 @@ impl TextRenderer {
         let mut layout = Layout::new(CoordinateSystem::PositiveYDown);
         layout.reset(&LayoutSettings::default());
         layout.append(&[&self.font], &TextStyle::new(text, self.px, 0));
-        if layout.glyphs().is_empty() {
+        let glyphs = layout.glyphs();
+        if glyphs.is_empty() {
             return Vec2::ZERO;
         }
         let mut min_x = f32::MAX;
-        let mut min_y = f32::MAX;
         let mut max_x = f32::MIN;
-        let mut max_y = f32::MIN;
-        for g in layout.glyphs() {
+        let mut min_y_actual = f32::MAX;
+        let mut max_y_actual = f32::MIN;
+        for g in glyphs {
             min_x = min_x.min(g.x);
-            min_y = min_y.min(g.y);
             max_x = max_x.max(g.x + g.width as f32);
-            max_y = max_y.max(g.y + g.height as f32);
+            min_y_actual = min_y_actual.min(g.y);
+            max_y_actual = max_y_actual.max(g.y + g.height as f32);
+        }
+
+        let mut top = min_y_actual;
+        let mut bottom = max_y_actual;
+        if let Some(lines) = layout.lines() {
+            if let Some(line) = lines.first() {
+                let baseline = line.baseline_y;
+                top = top.min(baseline - self.line_ascent);
+                bottom = bottom.max(baseline + self.line_descent);
+            }
         }
         Vec2::new(
             (max_x - min_x).ceil().max(0.0),
-            (max_y - min_y).ceil().max(0.0),
+            (bottom - top).ceil().max(0.0),
         )
     }
 
     /// Returns the distance in pixels from the top of the rasterized bounds to the text baseline
     pub fn baseline_offset(&self, text: &str) -> f32 {
         if text.is_empty() {
-            return 0.0;
+            return self.line_ascent;
         }
         let mut layout = Layout::new(CoordinateSystem::PositiveYDown);
         layout.reset(&LayoutSettings::default());
         layout.append(&[&self.font], &TextStyle::new(text, self.px, 0));
-        let mut min_y = 0.0;
-        for g in layout.glyphs() {
-            if g.y < min_y {
-                min_y = g.y;
+        let glyphs = layout.glyphs();
+        if glyphs.is_empty() {
+            return self.line_ascent;
+        }
+        let mut top = glyphs
+            .iter()
+            .fold(f32::MAX, |acc, g| if g.y < acc { g.y } else { acc });
+        if let Some(lines) = layout.lines() {
+            if let Some(line) = lines.first() {
+                let baseline = line.baseline_y;
+                top = top.min(baseline - self.line_ascent);
+                let offset = (baseline - top).max(0.0);
+                if offset > 0.0 {
+                    return offset;
+                }
             }
         }
-        (-min_y).max(0.0)
+        self.line_ascent
     }
 
     /// Returns cached line metrics (ascent above baseline, descent below baseline)
@@ -181,19 +209,31 @@ impl TextRenderer {
             return (vec![], 1, 1);
         }
         let mut min_x = f32::MAX;
-        let mut min_y = f32::MAX;
         let mut max_x = f32::MIN;
-        let mut max_y = f32::MIN;
+        let mut min_y_actual = f32::MAX;
+        let mut max_y_actual = f32::MIN;
         for g in layout.glyphs() {
             min_x = min_x.min(g.x);
-            min_y = min_y.min(g.y);
             max_x = max_x.max(g.x + g.width as f32);
-            max_y = max_y.max(g.y + g.height as f32);
+            min_y_actual = min_y_actual.min(g.y);
+            max_y_actual = max_y_actual.max(g.y + g.height as f32);
         }
+
+        let mut top = min_y_actual;
+        let mut bottom = max_y_actual;
+        if let Some(lines) = layout.lines() {
+            if let Some(line) = lines.first() {
+                let baseline = line.baseline_y;
+                // Anchor the raster bounds around the cached line metrics so the baseline stays fixed,
+                // while still covering any glyph pixels that extend beyond those metrics.
+                top = (baseline - self.line_ascent).min(top);
+                bottom = (baseline + self.line_descent).max(bottom);
+            }
+        }
+        let offset_y = -top;
         let width = (max_x - min_x).ceil().max(1.0) as u32;
-        let height = (max_y - min_y).ceil().max(1.0) as u32;
+        let height = (bottom - top).ceil().max(1.0) as u32;
         let offset_x = -min_x;
-        let offset_y = -min_y;
 
         let mut buffer = vec![0u8; (width * height * 4) as usize];
         for g in layout.glyphs() {

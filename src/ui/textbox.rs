@@ -125,7 +125,7 @@ impl Widget for TextBox {
             if let Some((ascent, descent)) = renderer.line_metrics() {
                 let center = self.position.y + self.size.y * 0.5;
                 let baseline = center + (ascent - descent) * 0.5;
-                let top = baseline - renderer.baseline_offset(&self.text);
+                let top = baseline - ascent;
                 renderer.draw_text(Vec2::new(x, top), text_color, &self.text);
             } else {
                 // Fallback to simple vertical centering when no font configured

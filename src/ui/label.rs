@@ -71,7 +71,7 @@ impl Widget for Label {
         }
         // Text (top-left with small padding)
         let padding = 6.0;
-        let text_pos = Vec2::new(self.position.x + padding, self.position.y + padding);
+        let text_pos = Vec2::new(self.position.x + padding, self.position.y);
         renderer.draw_text(text_pos, readable_text_color(fill), &self.text);
     }
 
