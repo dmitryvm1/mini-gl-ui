@@ -60,21 +60,23 @@ impl Checkbox {
 
 impl Widget for Checkbox {
     fn draw(&self, renderer: &QuadRenderer) {
+        let box_side = self.size.x.min(self.size.y);
+        let box_size = Vec2::splat(box_side);
         // Drop shadow softens the element over the scene
         let shadow_offset = Vec2::new(1.5, 2.5);
-        renderer.draw_rect(self.position + shadow_offset, self.size, colors::SHADOW);
-        renderer.draw_rect(self.position, self.size, colors::SURFACE);
-        let highlight_height = (self.size.y * 0.4).max(1.0);
+        renderer.draw_rect(self.position + shadow_offset, box_size, colors::SHADOW);
+        renderer.draw_rect(self.position, box_size, colors::SURFACE);
+        let highlight_height = (box_size.y * 0.4).max(1.0);
         renderer.draw_rect(
             self.position,
-            Vec2::new(self.size.x, highlight_height),
+            Vec2::new(box_size.x, highlight_height),
             Vec4::new(1.0, 1.0, 1.0, 0.1),
         );
-        renderer.draw_rect_outline(self.position, self.size, colors::BORDER_SOFT, 2.0);
-        if self.size.x > 6.0 && self.size.y > 6.0 {
+        renderer.draw_rect_outline(self.position, box_size, colors::BORDER_SOFT, 2.0);
+        if box_size.x > 6.0 && box_size.y > 6.0 {
             renderer.draw_rect_outline(
                 self.position + Vec2::splat(2.0),
-                self.size - Vec2::splat(4.0),
+                box_size - Vec2::splat(4.0),
                 colors::BORDER_SUBTLE,
                 1.0,
             );
@@ -82,12 +84,10 @@ impl Widget for Checkbox {
 
         // Draw check mark if checked
         if self.checked {
-            let inset = (self.size.x.min(self.size.y) * 0.24).clamp(3.0, 6.0);
+            let inset = (box_side * 0.24).clamp(3.0, 6.0);
             let check_pos = self.position + Vec2::splat(inset);
-            let check_size = Vec2::new(
-                (self.size.x - inset * 2.0).max(2.0),
-                (self.size.y - inset * 2.0).max(2.0),
-            );
+            let check_extent = (box_side - inset * 2.0).max(2.0);
+            let check_size = Vec2::splat(check_extent);
             renderer.draw_rect(check_pos, check_size, colors::CHECKMARK);
             renderer.draw_rect_outline(check_pos, check_size, colors::BORDER_SOFT, 1.0);
         }
@@ -96,7 +96,7 @@ impl Widget for Checkbox {
         let spacing = 8.0;
         let text_pos = {
             let baseline_origin =
-                Vec2::new(self.position.x + self.size.x + spacing, self.position.y);
+                Vec2::new(self.position.x + box_size.x + spacing, self.position.y);
             let measured = renderer.measure_text(&self.label);
             if measured == Vec2::ZERO {
                 baseline_origin
