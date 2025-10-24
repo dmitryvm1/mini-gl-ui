@@ -769,3 +769,82 @@ fn remote_host_rejects_duplicate_ids() {
     }
     assert!(host.contains("btn"));
 }
+
+#[test]
+fn remote_host_clear_all_removes_widgets() {
+    let channel = RemoteCommandChannel::new();
+    let mut host = RemoteUiHost::new(channel.clone());
+
+    channel.push(RemoteCommand {
+        id: "panel".to_string(),
+        method: "create".to_string(),
+        params: json!({
+            "kind": "panel",
+            "title": "Control",
+            "position": { "x": 0.0, "y": 0.0 },
+            "size": { "width": 200.0, "height": 150.0 }
+        }),
+    });
+    channel.push(RemoteCommand {
+        id: "status".to_string(),
+        method: "create".to_string(),
+        params: json!({
+            "kind": "label",
+            "text": "Ready"
+        }),
+    });
+
+    let report = host.process();
+    assert!(
+        report.errors.is_empty(),
+        "unexpected errors: {:?}",
+        report.errors
+    );
+    assert_eq!(report.processed, 2);
+    assert_eq!(host.len(), 2);
+
+    channel.push(RemoteCommand {
+        id: "panel".to_string(),
+        method: "attach_child".to_string(),
+        params: json!({
+            "child": "status"
+        }),
+    });
+
+    let report = host.process();
+    assert!(
+        report.errors.is_empty(),
+        "unexpected errors when attaching: {:?}",
+        report.errors
+    );
+    assert_eq!(report.processed, 1);
+    assert!(host.contains("status"));
+
+    channel.push(RemoteCommand {
+        id: "_host".to_string(),
+        method: "clear_all".to_string(),
+        params: json!({}),
+    });
+
+    let report = host.process();
+    assert!(report.errors.is_empty());
+    assert_eq!(report.processed, 1);
+    assert_eq!(host.len(), 0);
+    assert!(!host.contains("status"));
+    assert!(!host.contains("panel"));
+
+    channel.push(RemoteCommand {
+        id: "status".to_string(),
+        method: "create".to_string(),
+        params: json!({
+            "kind": "label",
+            "text": "Cleared"
+        }),
+    });
+
+    let report = host.process();
+    assert!(report.errors.is_empty());
+    assert_eq!(report.processed, 1);
+    assert!(host.contains("status"));
+    assert_eq!(host.len(), 1);
+}

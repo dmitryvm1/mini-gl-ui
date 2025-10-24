@@ -362,6 +362,10 @@ impl RemoteUiHost {
                     Ok(()) => report.processed += 1,
                     Err(err) => report.errors.push(err),
                 },
+                "clear_all" => {
+                    self.clear_all();
+                    report.processed += 1;
+                }
                 _ => match self.apply_widget_command(&command) {
                     Ok(()) => report.processed += 1,
                     Err(err) => report.errors.push(err),
@@ -766,6 +770,11 @@ impl RemoteUiHost {
                 method: command.method.clone(),
             }),
         }
+    }
+
+    fn clear_all(&mut self) {
+        self.widgets.clear();
+        self.draw_order.clear();
     }
 
     fn insert_widget(&mut self, id: String, widget: HostedWidget) {
