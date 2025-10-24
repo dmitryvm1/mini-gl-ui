@@ -121,9 +121,10 @@ fn main() {
                 WindowEvent::Close => window.set_should_close(true),
                 WindowEvent::CursorPos(x, y) => {
                     mouse_pos = Vec2::new(x as f32, y as f32);
-                    emitted_events.extend(host.handle_event(&UiEvent::CursorMoved {
+                    let (events, _) = host.handle_event(&UiEvent::CursorMoved {
                         position: mouse_pos,
-                    }));
+                    });
+                    emitted_events.extend(events);
                 }
                 WindowEvent::MouseButton(button, action, _) => {
                     if let Some(ui_button) = translate_button(button) {
@@ -132,21 +133,24 @@ fn main() {
                             Action::Release => UiButtonState::Released,
                             _ => continue,
                         };
-                        emitted_events.extend(host.handle_event(&UiEvent::MouseButton {
+                        let (events, _) = host.handle_event(&UiEvent::MouseButton {
                             button: ui_button,
                             state,
                             position: mouse_pos,
-                        }));
+                        });
+                        emitted_events.extend(events);
                     }
                 }
                 WindowEvent::Scroll(_, y) => {
-                    emitted_events.extend(host.handle_event(&UiEvent::Scroll {
+                    let (events, _) = host.handle_event(&UiEvent::Scroll {
                         delta: y as f32,
                         position: mouse_pos,
-                    }));
+                    });
+                    emitted_events.extend(events);
                 }
                 WindowEvent::Char(character) => {
-                    emitted_events.extend(host.handle_event(&UiEvent::CharacterInput(character)));
+                    let (events, _) = host.handle_event(&UiEvent::CharacterInput(character));
+                    emitted_events.extend(events);
                 }
                 WindowEvent::Key(Key::Escape, _, Action::Press, _) => {
                     window.set_should_close(true);
@@ -154,9 +158,10 @@ fn main() {
                 WindowEvent::Key(Key::Backspace, _, action, _)
                     if matches!(action, Action::Press | Action::Repeat) =>
                 {
-                    emitted_events.extend(host.handle_event(&UiEvent::KeyInput {
+                    let (events, _) = host.handle_event(&UiEvent::KeyInput {
                         key: UiKeyCode::Backspace,
-                    }));
+                    });
+                    emitted_events.extend(events);
                 }
                 _ => {}
             }

@@ -12,8 +12,7 @@ use std::collections::HashMap;
 use std::io::{self, BufRead, BufReader, Read};
 use std::sync::{
     atomic::{AtomicUsize, Ordering},
-    mpsc,
-    Arc, Mutex,
+    mpsc, Arc, Mutex,
 };
 use std::thread::{self, JoinHandle};
 use thiserror::Error;
@@ -78,11 +77,11 @@ impl RemoteCommandChannel {
         }
         let drained_count = drained.len();
         if drained_count > 0 {
-            let _ = self.pending.fetch_update(
-                Ordering::SeqCst,
-                Ordering::SeqCst,
-                |current| current.checked_sub(drained_count),
-            );
+            let _ = self
+                .pending
+                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |current| {
+                    current.checked_sub(drained_count)
+                });
         }
         drained
     }
@@ -384,22 +383,149 @@ impl RemoteUiHost {
         }
     }
 
-    /// Dispatches an input event to hosted widgets, returning emitted events.
-    pub fn handle_event(&mut self, event: &UiEvent) -> Vec<WidgetEvent> {
+    /// Dispatches an input event to hosted widgets, returning emitted events and a hit flag.
+    pub fn handle_event(&mut self, event: &UiEvent) -> (Vec<WidgetEvent>, bool) {
         let mut events = Vec::new();
+        let mut mouse_hit = false;
+        let mouse_position = Self::event_position(event);
         for id in self.draw_order.iter().rev() {
             if let Some(widget) = self.widgets.get_mut(id) {
+                if !mouse_hit {
+                    if let Some(position) = mouse_position {
+                        if widget.contains_point(position) {
+                            mouse_hit = true;
+                        }
+                    }
+                }
                 if let Some(widget_event) = widget.handle_event(event) {
                     events.push(widget_event);
                 }
             }
         }
-        events
+        (events, mouse_hit)
     }
 
     /// Returns true when a widget with the given identifier is registered.
     pub fn contains(&self, id: &str) -> bool {
         self.widgets.contains_key(id)
+    }
+
+    /// Returns true if any hosted widget currently has input focus.
+    pub fn has_focused_widget(&self) -> bool {
+        self.widgets
+            .values()
+            .any(|widget| self.widget_has_focus(widget))
+    }
+
+    fn widget_has_focus(&self, widget: &HostedWidget) -> bool {
+        match widget {
+            HostedWidget::TextBox(textbox) => textbox.is_focused(),
+            HostedWidget::Panel(panel) => self.panel_has_focus(panel),
+            HostedWidget::HorizontalLayout(layout) => self.horizontal_layout_has_focus(layout),
+            HostedWidget::VerticalLayout(layout) => self.vertical_layout_has_focus(layout),
+            HostedWidget::Attached(attached) => self.attached_widget_has_focus(attached),
+            _ => false,
+        }
+    }
+
+    fn panel_has_focus(&self, panel: &Panel) -> bool {
+        (0..panel.len()).any(|index| {
+            panel
+                .child(index)
+                .map_or(false, |child| self.layout_element_has_focus(child))
+        })
+    }
+
+    fn horizontal_layout_has_focus(&self, layout: &HorizontalLayout) -> bool {
+        (0..layout.len()).any(|index| {
+            layout
+                .child(index)
+                .map_or(false, |child| self.layout_element_has_focus(child))
+        })
+    }
+
+    fn vertical_layout_has_focus(&self, layout: &VerticalLayout) -> bool {
+        (0..layout.len()).any(|index| {
+            layout
+                .child(index)
+                .map_or(false, |child| self.layout_element_has_focus(child))
+        })
+    }
+
+    fn layout_element_has_focus(&self, element: &dyn LayoutElement) -> bool {
+        if let Some(textbox) = element.as_any().downcast_ref::<TextBox>() {
+            textbox.is_focused()
+        } else if let Some(panel) = element.as_any().downcast_ref::<Panel>() {
+            self.panel_has_focus(panel)
+        } else if let Some(layout) = element.as_any().downcast_ref::<HorizontalLayout>() {
+            self.horizontal_layout_has_focus(layout)
+        } else if let Some(layout) = element.as_any().downcast_ref::<VerticalLayout>() {
+            self.vertical_layout_has_focus(layout)
+        } else {
+            false
+        }
+    }
+
+    fn attached_widget_has_focus(&self, attached: &AttachedWidget) -> bool {
+        self.resolve_attached_element(attached)
+            .map_or(false, |element| self.layout_element_has_focus(element))
+    }
+
+    fn resolve_attached_element<'a>(
+        &'a self,
+        attached: &'a AttachedWidget,
+    ) -> Option<&'a dyn LayoutElement> {
+        let parent_id = attached.parent.id();
+
+        if let Some(HostedWidget::Attached(parent_attached)) = self.widgets.get(parent_id) {
+            let parent_element = self.resolve_attached_element(parent_attached)?;
+            return Self::child_from_parent_element(
+                parent_element,
+                &attached.parent,
+                attached.slot,
+            );
+        }
+
+        match (&attached.parent, self.widgets.get(parent_id)?) {
+            (ParentLink::Panel(_), HostedWidget::Panel(panel)) => panel.child(attached.slot),
+            (ParentLink::HorizontalLayout(_), HostedWidget::HorizontalLayout(layout)) => {
+                layout.child(attached.slot)
+            }
+            (ParentLink::VerticalLayout(_), HostedWidget::VerticalLayout(layout)) => {
+                layout.child(attached.slot)
+            }
+            _ => None,
+        }
+    }
+
+    fn child_from_parent_element<'a>(
+        parent_element: &'a dyn LayoutElement,
+        parent_link: &ParentLink,
+        slot: usize,
+    ) -> Option<&'a dyn LayoutElement> {
+        match parent_link {
+            ParentLink::Panel(_) => parent_element
+                .as_any()
+                .downcast_ref::<Panel>()
+                .and_then(|panel| panel.child(slot)),
+            ParentLink::HorizontalLayout(_) => parent_element
+                .as_any()
+                .downcast_ref::<HorizontalLayout>()
+                .and_then(|layout| layout.child(slot)),
+            ParentLink::VerticalLayout(_) => parent_element
+                .as_any()
+                .downcast_ref::<VerticalLayout>()
+                .and_then(|layout| layout.child(slot)),
+        }
+    }
+
+    fn event_position(event: &UiEvent) -> Option<Vec2> {
+        match event {
+            UiEvent::CursorMoved { position }
+            | UiEvent::MouseButton { position, .. }
+            | UiEvent::Scroll { position, .. } => Some(*position),
+            _ => None,
+        }
     }
 
     /// Number of hosted widgets.
@@ -900,6 +1026,20 @@ impl HostedWidget {
         }
     }
 
+    fn contains_point(&self, point: Vec2) -> bool {
+        match self {
+            HostedWidget::Button(widget) => widget.contains_point(point),
+            HostedWidget::Checkbox(widget) => widget.contains_point(point),
+            HostedWidget::Label(widget) => widget.contains_point(point),
+            HostedWidget::TextBox(widget) => widget.contains_point(point),
+            HostedWidget::Dropdown(widget) => widget.contains_point(point),
+            HostedWidget::Panel(widget) => widget.contains_point(point),
+            HostedWidget::HorizontalLayout(widget) => widget.contains_point(point),
+            HostedWidget::VerticalLayout(widget) => widget.contains_point(point),
+            HostedWidget::Attached(_) => false,
+        }
+    }
+
     #[allow(dead_code)]
     fn register<'a>(&'a mut self, session: RemoteUiSession<'a>, id: &str) -> RemoteUiSession<'a> {
         match self {
@@ -1108,9 +1248,8 @@ impl AttachedWidget {
                     );
                 }
                 (ParentLink::HorizontalLayout(_), AttachedKind::HorizontalLayout) => {
-                    let layout = attached_meta.borrow_child_mut::<HorizontalLayout>(
-                        host, request_id, method,
-                    )?;
+                    let layout = attached_meta
+                        .borrow_child_mut::<HorizontalLayout>(host, request_id, method)?;
                     return downcast_child(
                         layout.child_mut(self.slot),
                         request_id,
@@ -1167,8 +1306,7 @@ impl AttachedWidget {
                 }
             }
             ParentLink::VerticalLayout(_) => {
-                if let Some(HostedWidget::VerticalLayout(layout)) =
-                    host.widgets.get_mut(parent_key)
+                if let Some(HostedWidget::VerticalLayout(layout)) = host.widgets.get_mut(parent_key)
                 {
                     return downcast_child(
                         layout.child_mut(self.slot),

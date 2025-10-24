@@ -581,19 +581,35 @@ fn remote_host_attaches_button_to_layout() {
     assert_eq!(report.processed, 1);
     assert!(host.is_attached_to("button", "layout"));
 
-    let mut events = host.handle_event(&UiEvent::CursorMoved {
+    let (mut events, cursor_hit) = host.handle_event(&UiEvent::CursorMoved {
         position: Vec2::new(12.0, 12.0),
     });
-    events.extend(host.handle_event(&UiEvent::MouseButton {
+    assert!(
+        cursor_hit,
+        "cursor move inside button bounds should register a hit"
+    );
+
+    let (pressed_events, pressed_hit) = host.handle_event(&UiEvent::MouseButton {
         button: MouseButton::Left,
         state: ButtonState::Pressed,
         position: Vec2::new(12.0, 12.0),
-    }));
-    events.extend(host.handle_event(&UiEvent::MouseButton {
+    });
+    assert!(
+        pressed_hit,
+        "mouse press inside button bounds should register a hit"
+    );
+    events.extend(pressed_events);
+
+    let (released_events, released_hit) = host.handle_event(&UiEvent::MouseButton {
         button: MouseButton::Left,
         state: ButtonState::Released,
         position: Vec2::new(12.0, 12.0),
-    }));
+    });
+    assert!(
+        released_hit,
+        "mouse release inside button bounds should register a hit"
+    );
+    events.extend(released_events);
 
     assert!(
         events.iter().any(|event| matches!(
@@ -601,6 +617,16 @@ fn remote_host_attaches_button_to_layout() {
             WidgetEvent::ButtonClicked { label } if label == "Remote Button"
         )),
         "attached button did not emit click event"
+    );
+
+    let (_, outside_hit) = host.handle_event(&UiEvent::MouseButton {
+        button: MouseButton::Left,
+        state: ButtonState::Pressed,
+        position: Vec2::new(999.0, 999.0),
+    });
+    assert!(
+        !outside_hit,
+        "mouse press outside all widgets should not register a hit"
     );
 }
 
@@ -768,6 +794,74 @@ fn remote_host_rejects_duplicate_ids() {
         other => panic!("unexpected error variant: {:?}", other),
     }
     assert!(host.contains("btn"));
+}
+
+#[test]
+fn remote_host_reports_focused_widget() {
+    let channel = RemoteCommandChannel::new();
+    let mut host = RemoteUiHost::new(channel.clone());
+
+    channel.push(RemoteCommand {
+        id: "panel".to_string(),
+        method: "create".to_string(),
+        params: json!({
+            "kind": "panel",
+            "title": "Controls",
+            "position": { "x": 0.0, "y": 0.0 },
+            "size": { "width": 200.0, "height": 120.0 }
+        }),
+    });
+    channel.push(RemoteCommand {
+        id: "input".to_string(),
+        method: "create".to_string(),
+        params: json!({
+            "kind": "textbox",
+            "position": { "x": 12.0, "y": 18.0 },
+            "size": { "width": 160.0, "height": 28.0 }
+        }),
+    });
+
+    let report = host.process();
+    assert!(
+        report.errors.is_empty(),
+        "unexpected errors: {:?}",
+        report.errors
+    );
+    assert!(!host.has_focused_widget());
+
+    channel.push(RemoteCommand {
+        id: "panel".to_string(),
+        method: "attach_child".to_string(),
+        params: json!({ "child": "input" }),
+    });
+
+    let report = host.process();
+    assert!(
+        report.errors.is_empty(),
+        "unexpected errors when attaching: {:?}",
+        report.errors
+    );
+    assert!(!host.has_focused_widget());
+
+    channel.push(RemoteCommand {
+        id: "input".to_string(),
+        method: "set_focused".to_string(),
+        params: json!({ "value": true }),
+    });
+
+    let report = host.process();
+    assert!(report.errors.is_empty());
+    assert!(host.has_focused_widget());
+
+    channel.push(RemoteCommand {
+        id: "input".to_string(),
+        method: "set_focused".to_string(),
+        params: json!({ "value": false }),
+    });
+
+    let report = host.process();
+    assert!(report.errors.is_empty());
+    assert!(!host.has_focused_widget());
 }
 
 #[test]
