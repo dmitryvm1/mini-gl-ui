@@ -10,12 +10,15 @@ use mini_gl_ui::{
     Vec2,
 };
 use serde_json::json;
-use std::fs;
+use std::{
+    fs,
+    io::{self, BufRead},
+    sync::mpsc,
+    thread,
+};
 
 const WINDOW_WIDTH: u32 = 1024;
 const WINDOW_HEIGHT: u32 = 640;
-const REMOTE_PORT: &str = "127.0.0.1:4762";
-
 fn main() {
     let mut glfw = glfw::init(glfw::fail_on_errors).expect("failed to initialize GLFW");
     glfw.window_hint(glfw::WindowHint::ContextVersion(3, 3));
@@ -64,16 +67,34 @@ fn main() {
     let command_channel = RemoteCommandChannel::new();
     let mut host = RemoteUiHost::new(command_channel.clone());
 
-    let _tcp_listener = command_channel
-        .spawn_json_tcp_listener(REMOTE_PORT)
-        .map_err(|err| eprintln!("TCP listener disabled: {err}"))
-        .ok();
+    let (stdin_sender, stdin_receiver) = mpsc::channel::<String>();
+    let _stdin_listener = command_channel.spawn_json_channel_listener(stdin_receiver);
+
+    thread::spawn(move || {
+        let stdin = io::stdin();
+        for line in stdin.lock().lines() {
+            match line {
+                Ok(line) => {
+                    if line.trim().is_empty() {
+                        continue;
+                    }
+                    if stdin_sender.send(line).is_err() {
+                        break;
+                    }
+                }
+                Err(err) => {
+                    eprintln!("stdin reader failed: {err}");
+                    break;
+                }
+            }
+        }
+    });
 
     println!("Remote demo running.");
-    println!("Send newline-delimited JSON commands to {REMOTE_PORT}.");
+    println!("Type or pipe newline-delimited JSON commands into this terminal.");
     println!(
         "Example: {sample}",
-        sample = r#"{"id":"status","method":"set_text","params":{"text":"hello from tcp"}}"#
+        sample = r#"{"id":"status","method":"set_text","params":{"text":"hello from channel"}}"#
     );
     println!(
         "Attach example: {}",
@@ -381,7 +402,7 @@ fn bootstrap_scene(channel: &RemoteCommandChannel) {
         "status",
         "set_text",
         json!({
-            "text": format!("Ready. Listening on {REMOTE_PORT}")
+            "text": "Ready. Waiting for stdin commands"
         }),
     );
 }

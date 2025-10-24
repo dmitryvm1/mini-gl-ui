@@ -8,10 +8,13 @@ use glam::Vec4;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::io::{self, BufRead, BufReader, Read};
-use std::net::{TcpListener, ToSocketAddrs};
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    mpsc,
+    Arc, Mutex,
+};
 use std::thread::{self, JoinHandle};
 use thiserror::Error;
 
@@ -28,23 +31,29 @@ pub struct RemoteCommand {
 }
 
 /// Thread-safe queue storing pending remote commands.
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct RemoteCommandChannel {
-    queue: Arc<Mutex<VecDeque<RemoteCommand>>>,
+    sender: mpsc::Sender<RemoteCommand>,
+    receiver: Arc<Mutex<mpsc::Receiver<RemoteCommand>>>,
+    pending: Arc<AtomicUsize>,
 }
 
 impl RemoteCommandChannel {
     /// Creates a new empty channel.
     pub fn new() -> Self {
+        let (sender, receiver) = mpsc::channel();
         Self {
-            queue: Arc::new(Mutex::new(VecDeque::new())),
+            sender,
+            receiver: Arc::new(Mutex::new(receiver)),
+            pending: Arc::new(AtomicUsize::new(0)),
         }
     }
 
     /// Adds a parsed command to the queue.
     pub fn push(&self, command: RemoteCommand) {
-        if let Ok(mut queue) = self.queue.lock() {
-            queue.push_back(command);
+        self.pending.fetch_add(1, Ordering::SeqCst);
+        if self.sender.send(command).is_err() {
+            self.pending.fetch_sub(1, Ordering::SeqCst);
         }
     }
 
@@ -57,16 +66,30 @@ impl RemoteCommandChannel {
 
     /// Removes and returns all pending commands.
     pub fn drain(&self) -> Vec<RemoteCommand> {
-        if let Ok(mut queue) = self.queue.lock() {
-            queue.drain(..).collect()
-        } else {
-            Vec::new()
+        let mut drained = Vec::new();
+        if let Ok(receiver) = self.receiver.lock() {
+            loop {
+                match receiver.try_recv() {
+                    Ok(command) => drained.push(command),
+                    Err(mpsc::TryRecvError::Empty) => break,
+                    Err(mpsc::TryRecvError::Disconnected) => break,
+                }
+            }
         }
+        let drained_count = drained.len();
+        if drained_count > 0 {
+            let _ = self.pending.fetch_update(
+                Ordering::SeqCst,
+                Ordering::SeqCst,
+                |current| current.checked_sub(drained_count),
+            );
+        }
+        drained
     }
 
     /// Returns current queue length. Intended for diagnostics and tests.
     pub fn len(&self) -> usize {
-        self.queue.lock().map(|q| q.len()).unwrap_or_default()
+        self.pending.load(Ordering::SeqCst)
     }
 
     /// Returns true when no commands are pending.
@@ -98,36 +121,33 @@ impl RemoteCommandChannel {
         })
     }
 
-    /// Spawns a TCP listener that accepts JSON command streams on the given address.
+    /// Spawns a background worker that consumes JSON commands from a standard channel.
     ///
-    /// Each client connection is processed sequentially on the spawned thread.
-    /// When parsing fails the connection is closed.
-    pub fn spawn_json_tcp_listener<A>(
+    /// Each received message must be a newline-delimited JSON string describing a [`RemoteCommand`].
+    /// Empty messages are ignored.
+    pub fn spawn_json_channel_listener(
         &self,
-        addr: A,
-    ) -> io::Result<JoinHandle<Result<(), RemoteTransportError>>>
-    where
-        A: ToSocketAddrs + Send + 'static,
-    {
+        receiver: mpsc::Receiver<String>,
+    ) -> JoinHandle<Result<(), RemoteTransportError>> {
         let channel = self.clone();
-        let listener = TcpListener::bind(addr)?;
-        let handle = thread::spawn(move || {
-            for stream in listener.incoming() {
-                let stream = stream?;
-                let reader = BufReader::new(stream);
-                for line in reader.lines() {
-                    let line = line?;
-                    if line.trim().is_empty() {
-                        continue;
-                    }
-                    let command: RemoteCommand =
-                        serde_json::from_str(&line).map_err(RemoteTransportError::Parse)?;
-                    channel.push(command);
+        thread::spawn(move || {
+            while let Ok(message) = receiver.recv() {
+                let trimmed = message.trim();
+                if trimmed.is_empty() {
+                    continue;
                 }
+                let command: RemoteCommand =
+                    serde_json::from_str(trimmed).map_err(RemoteTransportError::Parse)?;
+                channel.push(command);
             }
             Ok(())
-        });
-        Ok(handle)
+        })
+    }
+}
+
+impl Default for RemoteCommandChannel {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -963,14 +983,6 @@ impl ParentLink {
             | ParentLink::VerticalLayout(id) => id,
         }
     }
-
-    fn target_name(&self) -> &'static str {
-        match self {
-            ParentLink::Panel(_) => "Panel",
-            ParentLink::HorizontalLayout(_) => "HorizontalLayout",
-            ParentLink::VerticalLayout(_) => "VerticalLayout",
-        }
-    }
 }
 
 #[derive(Clone, Copy)]
@@ -1050,44 +1062,127 @@ impl AttachedWidget {
         request_id: &str,
         method: &str,
     ) -> Result<&'a mut T, RemoteError> {
-        let parent_id = self.parent.id().to_string();
-        match (&self.parent, host.widgets.get_mut(&parent_id)) {
-            (ParentLink::Panel(_), Some(HostedWidget::Panel(panel))) => panel
-                .child_mut(self.slot)
+        fn downcast_child<'a, T: LayoutElement + 'static>(
+            child: Option<&'a mut dyn LayoutElement>,
+            request_id: &str,
+            method: &str,
+            kind: AttachedKind,
+        ) -> Result<&'a mut T, RemoteError> {
+            child
                 .and_then(|child| child.as_any_mut().downcast_mut::<T>())
                 .ok_or_else(|| RemoteError::UnsupportedMethod {
                     id: request_id.to_string(),
                     method: method.to_string(),
-                    target: self.kind.target_name(),
-                }),
-            (ParentLink::HorizontalLayout(_), Some(HostedWidget::HorizontalLayout(layout))) => {
-                layout
-                    .child_mut(self.slot)
-                    .and_then(|child| child.as_any_mut().downcast_mut::<T>())
-                    .ok_or_else(|| RemoteError::UnsupportedMethod {
-                        id: request_id.to_string(),
-                        method: method.to_string(),
-                        target: self.kind.target_name(),
-                    })
-            }
-            (ParentLink::VerticalLayout(_), Some(HostedWidget::VerticalLayout(layout))) => layout
-                .child_mut(self.slot)
-                .and_then(|child| child.as_any_mut().downcast_mut::<T>())
-                .ok_or_else(|| RemoteError::UnsupportedMethod {
-                    id: request_id.to_string(),
-                    method: method.to_string(),
-                    target: self.kind.target_name(),
-                }),
-            (_, Some(_)) => Err(RemoteError::UnsupportedMethod {
-                id: parent_id,
-                method: method.to_string(),
-                target: self.parent.target_name(),
-            }),
-            (_, None) => Err(RemoteError::UnknownTarget {
-                id: parent_id,
-                method: method.to_string(),
-            }),
+                    target: kind.target_name(),
+                })
         }
+
+        let parent_key = self.parent.id();
+
+        if let Some(attached_meta) = host.widgets.get(parent_key).and_then(|widget| {
+            if let HostedWidget::Attached(attached) = widget {
+                Some(attached.clone())
+            } else {
+                None
+            }
+        }) {
+            let attached_kind = attached_meta.kind;
+            match (&self.parent, attached_kind) {
+                (ParentLink::Panel(_), AttachedKind::Panel) => {
+                    let panel =
+                        attached_meta.borrow_child_mut::<Panel>(host, request_id, method)?;
+                    return downcast_child(
+                        panel.child_mut(self.slot),
+                        request_id,
+                        method,
+                        self.kind,
+                    );
+                }
+                (ParentLink::HorizontalLayout(_), AttachedKind::HorizontalLayout) => {
+                    let layout = attached_meta.borrow_child_mut::<HorizontalLayout>(
+                        host, request_id, method,
+                    )?;
+                    return downcast_child(
+                        layout.child_mut(self.slot),
+                        request_id,
+                        method,
+                        self.kind,
+                    );
+                }
+                (ParentLink::VerticalLayout(_), AttachedKind::VerticalLayout) => {
+                    let layout = attached_meta
+                        .borrow_child_mut::<VerticalLayout>(host, request_id, method)?;
+                    return downcast_child(
+                        layout.child_mut(self.slot),
+                        request_id,
+                        method,
+                        self.kind,
+                    );
+                }
+                (_, other_kind) => {
+                    return Err(RemoteError::UnsupportedMethod {
+                        id: parent_key.to_string(),
+                        method: method.to_string(),
+                        target: other_kind.target_name(),
+                    });
+                }
+            }
+        }
+
+        let existing_type = host
+            .widgets
+            .get(parent_key)
+            .map(|widget| widget.type_name());
+
+        match self.parent {
+            ParentLink::Panel(_) => {
+                if let Some(HostedWidget::Panel(panel)) = host.widgets.get_mut(parent_key) {
+                    return downcast_child(
+                        panel.child_mut(self.slot),
+                        request_id,
+                        method,
+                        self.kind,
+                    );
+                }
+            }
+            ParentLink::HorizontalLayout(_) => {
+                if let Some(HostedWidget::HorizontalLayout(layout)) =
+                    host.widgets.get_mut(parent_key)
+                {
+                    return downcast_child(
+                        layout.child_mut(self.slot),
+                        request_id,
+                        method,
+                        self.kind,
+                    );
+                }
+            }
+            ParentLink::VerticalLayout(_) => {
+                if let Some(HostedWidget::VerticalLayout(layout)) =
+                    host.widgets.get_mut(parent_key)
+                {
+                    return downcast_child(
+                        layout.child_mut(self.slot),
+                        request_id,
+                        method,
+                        self.kind,
+                    );
+                }
+            }
+        }
+
+        if let Some(target) = existing_type {
+            return Err(RemoteError::UnsupportedMethod {
+                id: parent_key.to_string(),
+                method: method.to_string(),
+                target,
+            });
+        }
+
+        Err(RemoteError::UnknownTarget {
+            id: parent_key.to_string(),
+            method: method.to_string(),
+        })
     }
 
     fn attach_child(

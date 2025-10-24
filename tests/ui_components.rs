@@ -605,6 +605,63 @@ fn remote_host_attaches_button_to_layout() {
 }
 
 #[test]
+fn remote_host_updates_label_in_nested_layout() {
+    let channel = RemoteCommandChannel::new();
+    let mut host = RemoteUiHost::new(channel.clone());
+
+    channel.push(RemoteCommand {
+        id: "panel".to_string(),
+        method: "create".to_string(),
+        params: json!({
+            "kind": "panel",
+            "position": { "x": 0.0, "y": 0.0 },
+            "size": { "width": 240.0, "height": 180.0 }
+        }),
+    });
+    channel.push(RemoteCommand {
+        id: "layout".to_string(),
+        method: "create".to_string(),
+        params: json!({
+            "kind": "vertical_layout",
+            "position": { "x": 0.0, "y": 0.0 }
+        }),
+    });
+    channel.push(RemoteCommand {
+        id: "panel".to_string(),
+        method: "attach_child".to_string(),
+        params: json!({ "child": "layout" }),
+    });
+    channel.push(RemoteCommand {
+        id: "status".to_string(),
+        method: "create".to_string(),
+        params: json!({
+            "kind": "label",
+            "text": "Initial",
+            "position": { "x": 0.0, "y": 0.0 },
+            "size": { "width": 160.0, "height": 24.0 }
+        }),
+    });
+    channel.push(RemoteCommand {
+        id: "layout".to_string(),
+        method: "attach_child".to_string(),
+        params: json!({ "child": "status" }),
+    });
+    channel.push(RemoteCommand {
+        id: "status".to_string(),
+        method: "set_text".to_string(),
+        params: json!({ "text": "Updated" }),
+    });
+
+    let report = host.process();
+    assert!(
+        report.errors.is_empty(),
+        "unexpected remote errors: {:?}",
+        report.errors
+    );
+    assert_eq!(report.processed, 6);
+}
+
+#[test]
 fn remote_updates_layout_parameters() {
     let channel = RemoteCommandChannel::new();
     channel.push(RemoteCommand {
