@@ -77,6 +77,7 @@ pub enum WidgetEvent {
     PanelDragStarted,
     PanelDragged { position: Vec2 },
     PanelDragEnded,
+    PanelToggleChanged { collapsed: bool },
 }
 
 /// Common trait for UI components

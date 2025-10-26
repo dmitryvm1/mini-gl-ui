@@ -139,6 +139,50 @@ fn test_panel_title_bar_hit_detection() {
 }
 
 #[test]
+fn panel_collapsing_updates_height() {
+    let mut panel = Panel::new(
+        Vec2::new(50.0, 50.0),
+        Vec2::new(180.0, 140.0),
+        "Panel".to_string(),
+    );
+
+    let expanded_height = panel.size().y;
+    panel.set_collapsed(true);
+    assert!(panel.is_collapsed());
+    assert!(
+        (panel.size().y - panel.title_bar_height()).abs() < f32::EPSILON,
+        "expected collapsed height to equal title bar height"
+    );
+
+    panel.set_collapsed(false);
+    assert!(!panel.is_collapsed());
+    assert!((panel.size().y - expanded_height).abs() < f32::EPSILON);
+}
+
+#[test]
+fn panel_toggle_button_emits_event() {
+    let mut panel = Panel::new(
+        Vec2::new(25.0, 25.0),
+        Vec2::new(220.0, 160.0),
+        "Panel".to_string(),
+    );
+    let toggle_point = Vec2::new(
+        panel.position().x + 15.0,
+        panel.position().y + panel.title_bar_height() * 0.5,
+    );
+    let event = panel.handle_event(&UiEvent::MouseButton {
+        button: MouseButton::Left,
+        state: ButtonState::Pressed,
+        position: toggle_point,
+    });
+    match event {
+        Some(WidgetEvent::PanelToggleChanged { collapsed }) => assert!(collapsed),
+        other => panic!("expected toggle event, got {:?}", other),
+    }
+    assert!(panel.is_collapsed());
+}
+
+#[test]
 fn test_button_handle_event_emits_click() {
     let mut button = Button::new(
         Vec2::new(0.0, 0.0),

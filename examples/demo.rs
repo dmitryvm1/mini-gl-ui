@@ -896,6 +896,9 @@ fn main() {
                     WidgetEvent::PanelDragStarted => println!("Started dragging panel"),
                     WidgetEvent::PanelDragged { .. } => {}
                     WidgetEvent::PanelDragEnded => println!("Stopped dragging panel"),
+                    WidgetEvent::PanelToggleChanged { collapsed } => {
+                        println!("Panel {}", if collapsed { "collapsed" } else { "expanded" });
+                    }
                 }
             }
         }

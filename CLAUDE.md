@@ -58,7 +58,7 @@ All UI components implement the `Widget` trait ([src/ui/mod.rs](src/ui/mod.rs)):
 ### Event System
 Two parallel event flows:
 1. **UiEvent** (input): `CursorMoved`, `MouseButton`, `Scroll`, `CharacterInput`, `KeyInput` - consumed by widgets via `handle_event()`
-2. **WidgetEvent** (output): `ButtonClicked`, `CheckboxToggled`, `TextChanged`, `DropdownSelectionChanged`, `PanelDragStarted/Dragged/Ended` - emitted by widgets to notify application logic
+2. **WidgetEvent** (output): `ButtonClicked`, `CheckboxToggled`, `TextChanged`, `DropdownSelectionChanged`, `PanelDragStarted/Dragged/Ended`, `PanelToggleChanged` - emitted by widgets to notify application logic
 
 ### Remote Control Interface
 The remote interface ([src/ui/remote.rs](src/ui/remote.rs)) provides runtime control of widgets via JSON commands over IPC/sockets:

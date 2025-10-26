@@ -3,16 +3,18 @@ use crate::renderer::QuadRenderer;
 use crate::ui::{ButtonState, LayoutElement, MouseButton, UiEvent, Widget, WidgetEvent};
 use glam::{Vec2, Vec4};
 
-/// A draggable panel that can contain other widgets
+/// A draggable panel that can contain other widgets and be collapsed or expanded.
 pub struct Panel {
     position: Vec2,
     size: Vec2,
+    expanded_size: Vec2,
     title: String,
     title_bar_height: f32,
     background_color: Vec4,
     title_bar_color: Vec4,
     border_color: Vec4,
     is_dragging: bool,
+    is_collapsed: bool,
     drag_offset: Vec2,
     content_padding: Vec2,
     children: Vec<PanelChild>,
@@ -21,15 +23,20 @@ pub struct Panel {
 impl Panel {
     /// Creates a new panel
     pub fn new(position: Vec2, size: Vec2, title: String) -> Self {
+        let title_bar_height = 30.0;
+        let min_height = title_bar_height + 4.0;
+        let expanded_size = Vec2::new(size.x.max(0.0), size.y.max(min_height));
         Panel {
             position,
-            size,
+            size: expanded_size,
+            expanded_size,
             title,
-            title_bar_height: 30.0,
+            title_bar_height,
             background_color: translucent(colors::SURFACE_DARK, 0.72),
             title_bar_color: translucent(colors::ACCENT, 0.9),
             border_color: colors::BORDER_SOFT,
             is_dragging: false,
+            is_collapsed: false,
             drag_offset: Vec2::ZERO,
             content_padding: Vec2::splat(12.0),
             children: Vec::new(),
@@ -48,6 +55,32 @@ impl Panel {
         self.content_padding = Vec2::new(padding.x.max(0.0), padding.y.max(0.0));
         self.sync_children_positions();
         self
+    }
+
+    /// Returns true when the panel is collapsed.
+    pub fn is_collapsed(&self) -> bool {
+        self.is_collapsed
+    }
+
+    /// Collapses or expands the panel content area.
+    pub fn set_collapsed(&mut self, collapsed: bool) {
+        if self.is_collapsed == collapsed {
+            return;
+        }
+        self.is_collapsed = collapsed;
+        self.apply_stateful_size();
+        self.sync_children_positions();
+    }
+
+    /// Toggles the collapsed state of the panel.
+    pub fn toggle_collapsed(&mut self) {
+        let next_state = !self.is_collapsed;
+        self.set_collapsed(next_state);
+    }
+
+    /// Height of the title bar region.
+    pub fn title_bar_height(&self) -> f32 {
+        self.title_bar_height
     }
 
     /// Gets the panel title
@@ -106,7 +139,8 @@ impl Panel {
     /// Sets the panel size
     pub fn set_size(&mut self, size: Vec2) {
         let min_height = self.title_bar_height + 4.0;
-        self.size = Vec2::new(size.x.max(0.0), size.y.max(min_height));
+        self.expanded_size = Vec2::new(size.x.max(0.0), size.y.max(min_height));
+        self.apply_stateful_size();
         self.sync_children_positions();
     }
 
@@ -192,6 +226,14 @@ impl Panel {
             .map(|child| child.widget.as_mut())
     }
 
+    fn apply_stateful_size(&mut self) {
+        if self.is_collapsed {
+            self.size = Vec2::new(self.expanded_size.x, self.title_bar_height);
+        } else {
+            self.size = self.expanded_size;
+        }
+    }
+
     fn sync_children_positions(&mut self) {
         if self.children.is_empty() {
             return;
@@ -203,12 +245,51 @@ impl Panel {
     }
 
     fn dispatch_event_to_children(&mut self, event: &UiEvent) -> Option<WidgetEvent> {
+        if self.is_collapsed {
+            return None;
+        }
         for child in self.children.iter_mut().rev() {
             if let Some(widget_event) = child.widget.handle_event(event) {
                 return Some(widget_event);
             }
         }
         None
+    }
+
+    fn toggle_button_bounds(&self) -> (Vec2, Vec2) {
+        let margin_x = 10.0;
+        let button_size = (self.title_bar_height * 0.6).clamp(14.0, self.title_bar_height - 6.0);
+        let button_pos = Vec2::new(
+            self.position.x + margin_x,
+            self.position.y + (self.title_bar_height - button_size) * 0.5,
+        );
+        (button_pos, Vec2::splat(button_size))
+    }
+
+    fn toggle_button_contains_point(&self, point: Vec2) -> bool {
+        let (pos, size) = self.toggle_button_bounds();
+        point.x >= pos.x
+            && point.x <= pos.x + size.x
+            && point.y >= pos.y
+            && point.y <= pos.y + size.y
+    }
+
+    fn draw_toggle_button(&self, renderer: &QuadRenderer, position: Vec2, size: Vec2) {
+        let fill_color = if self.is_collapsed {
+            translucent(colors::SURFACE_LIGHT, 0.75)
+        } else {
+            translucent(colors::SURFACE, 0.8)
+        };
+        renderer.draw_rect(position, size, fill_color);
+        renderer.draw_rect_outline(position, size, colors::BORDER_SOFT, 1.0);
+
+        let symbol = if self.is_collapsed { "+" } else { "-" };
+        let symbol_size = renderer.measure_text(symbol);
+        let symbol_pos = Vec2::new(
+            position.x + (size.x - symbol_size.x) * 0.5,
+            position.y + (size.y - symbol_size.y) * 0.5,
+        );
+        renderer.draw_text(symbol_pos, colors::TEXT_PRIMARY, symbol);
     }
 }
 
@@ -226,32 +307,39 @@ impl Widget for Panel {
             Vec2::new(self.size.x, (self.title_bar_height * 0.6).max(1.0)),
             Vec4::new(1.0, 1.0, 1.0, 0.16),
         );
+        let (toggle_pos, toggle_size) = self.toggle_button_bounds();
+        self.draw_toggle_button(renderer, toggle_pos, toggle_size);
         // Title text centered in title bar
         let text_size = renderer.measure_text(&self.title);
+        let desired_x = self.position.x + (self.size.x - text_size.x) * 0.5;
+        let min_text_x = toggle_pos.x + toggle_size.x + 8.0;
         let text_pos = Vec2::new(
-            self.position.x + (self.size.x - text_size.x) * 0.5,
+            desired_x.max(min_text_x),
             self.position.y + (self.title_bar_height - text_size.y) * 0.5,
         );
         renderer.draw_text(text_pos, colors::TEXT_PRIMARY, &self.title);
 
-        // Draw panel background
-        let panel_pos = Vec2::new(self.position.x, self.position.y + self.title_bar_height);
-        let panel_size = Vec2::new(self.size.x, self.size.y - self.title_bar_height);
-        renderer.draw_rect(panel_pos, panel_size, self.background_color);
-        renderer.draw_rect(
-            panel_pos,
-            Vec2::new(self.size.x, (panel_size.y * 0.3).max(1.0)),
-            Vec4::new(1.0, 1.0, 1.0, 0.06),
-        );
+        let content_height = (self.size.y - self.title_bar_height).max(0.0);
+        if content_height > 0.5 {
+            // Draw panel background
+            let panel_pos = Vec2::new(self.position.x, self.position.y + self.title_bar_height);
+            let panel_size = Vec2::new(self.size.x, content_height);
+            renderer.draw_rect(panel_pos, panel_size, self.background_color);
+            renderer.draw_rect(
+                panel_pos,
+                Vec2::new(self.size.x, (panel_size.y * 0.3).max(1.0)),
+                Vec4::new(1.0, 1.0, 1.0, 0.06),
+            );
 
-        // Draw line separating title bar from content
-        let separator_pos = Vec2::new(self.position.x, self.position.y + self.title_bar_height);
-        let separator_size = Vec2::new(self.size.x, 2.0);
-        renderer.draw_rect(separator_pos, separator_size, colors::BORDER_SOFT);
+            // Draw line separating title bar from content
+            let separator_pos = Vec2::new(self.position.x, self.position.y + self.title_bar_height);
+            let separator_size = Vec2::new(self.size.x, 2.0);
+            renderer.draw_rect(separator_pos, separator_size, colors::BORDER_SOFT);
 
-        // Draw child widgets
-        for child in &self.children {
-            child.widget.draw(renderer);
+            // Draw child widgets
+            for child in &self.children {
+                child.widget.draw(renderer);
+            }
         }
 
         // Draw border around the entire panel
@@ -291,6 +379,12 @@ impl Widget for Panel {
                 }
                 match state {
                     ButtonState::Pressed => {
+                        if self.toggle_button_contains_point(*position) {
+                            self.toggle_collapsed();
+                            return Some(WidgetEvent::PanelToggleChanged {
+                                collapsed: self.is_collapsed,
+                            });
+                        }
                         if self.title_bar_contains_point(*position) {
                             self.start_drag(*position);
                             Some(WidgetEvent::PanelDragStarted)
@@ -326,15 +420,14 @@ impl Widget for Panel {
             && point.x <= self.position.x + self.size.x
             && point.y >= self.position.y
             && point.y <= self.position.y + self.size.y;
-        let mut child_contains = false;
-        for c in &self.children {
-            if c.widget.contains_point(point) {
-                child_contains = true;
-                break;
-            }
-        }
-        within_panel
-            || child_contains
+        let child_contains = if self.is_collapsed {
+            false
+        } else {
+            self.children
+                .iter()
+                .any(|child| child.widget.contains_point(point))
+        };
+        within_panel || child_contains
     }
 }
 

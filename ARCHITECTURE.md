@@ -117,9 +117,11 @@ pub trait Widget {
 - Draggable container panel
 - Features:
   - Title bar for dragging
+  - +/- icon to collapse or expand the content area
   - Content area
   - Drag state management
 - Methods for drag interaction: `start_drag()`, `update_drag()`, `stop_drag()`
+- Collapse controls: `set_collapsed()`, `toggle_collapsed()`, `is_collapsed()`
 
 ### State Management
 

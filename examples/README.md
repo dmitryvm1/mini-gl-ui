@@ -7,7 +7,7 @@ The `demo.rs` example demonstrates all UI components in the mini-gl-ui library:
 - Button (with hover and click states)
 - Checkbox (toggle on/off)
 - TextBox (with focus and text input)
-- Draggable Panel
+- Draggable & collapsible Panel (+/- toggle)
 
 ### Running the Demo
 
@@ -46,7 +46,7 @@ cargo run --example demo
 1. **Button Interaction**: Click the button to see console output
 2. **Checkbox Toggle**: Click the checkbox to toggle its state
 3. **TextBox Focus**: Click the textbox to focus it, then type keys (a-e, space, backspace)
-4. **Panel Dragging**: Click and drag the panel's title bar to move it around
+4. **Panel Dragging & Collapse**: Click and drag the panel's title bar to move it or tap the +/- icon to collapse/expand its contents
 5. **Visual Feedback**: Hover effects on buttons, focus states on textboxes
 
 ### Controls

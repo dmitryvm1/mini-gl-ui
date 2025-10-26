@@ -20,7 +20,7 @@ This library provides simple and easy-to-use primitives for building OpenGL-base
 - **Button**: Clickable button with hover and pressed states
 - **Checkbox**: Toggle checkbox with checked/unchecked states
 - **TextBox**: Text input field with focus states
-- **Panel**: Draggable panel with title bar
+- **Panel**: Draggable panel with title bar and +/- collapse toggle
 
 ## Usage
 
@@ -74,6 +74,8 @@ button.draw(&renderer);
 checkbox.draw(&renderer);
 panel.draw(&renderer);
 ```
+
+Panels display a `+` icon when collapsed and a `-` icon when expanded, letting users quickly hide or reveal the content area.
 
 ### Running the Demo
 
