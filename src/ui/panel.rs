@@ -330,7 +330,6 @@ impl Widget for Panel {
         for c in &self.children {
             if c.widget.contains_point(point) {
                 child_contains = true;
-                println!("Child hit: {}", c.widget.type_name());
                 break;
             }
         }
