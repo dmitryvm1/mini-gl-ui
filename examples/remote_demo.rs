@@ -111,6 +111,7 @@ fn main() {
 
     let mut mouse_pos = Vec2::ZERO;
     let mut spawned_labels = 0usize;
+    let mut debug_overlay_enabled = false;
 
     while !window.should_close() {
         glfw.poll_events();
@@ -172,25 +173,7 @@ fn main() {
                 WidgetEvent::ButtonClicked { label } => {
                     if label == "Spawn Remote Label" {
                         spawned_labels += 1;
-                        let new_id = format!("spawned_label_{spawned_labels}");
-                        enqueue(
-                            &command_channel,
-                            &new_id,
-                            "create",
-                            json!({
-                                "kind": "label",
-                                "text": format!("Dynamic label #{spawned_labels}"),
-                                "position": { "x": 0.0, "y": 0.0 },
-                                "size": { "width": 260.0, "height": 26.0 },
-                                "color": { "r": 0.35, "g": 0.58, "b": 0.92, "a": 0.88 }
-                            }),
-                        );
-                        enqueue(
-                            &command_channel,
-                            "control_layout",
-                            "attach_child",
-                            json!({ "child": new_id }),
-                        );
+                        spawn_dynamic_label(&command_channel, spawned_labels);
                         update_status(
                             &command_channel,
                             format!("Spawned dynamic label #{spawned_labels}"),
@@ -200,6 +183,9 @@ fn main() {
                     }
                 }
                 WidgetEvent::CheckboxToggled { label, checked } => {
+                    if label == "Enable debug overlay" {
+                        debug_overlay_enabled = checked;
+                    }
                     update_status(
                         &command_channel,
                         format!(
@@ -220,7 +206,16 @@ fn main() {
                     update_status(&command_channel, message);
                 }
                 WidgetEvent::DropdownSelectionChanged { id, selected } => {
-                    update_status(&command_channel, format!("Dropdown {id} -> {selected}"));
+                    if id == "remote_action_dropdown" {
+                        handle_remote_action_dropdown(
+                            &command_channel,
+                            selected.as_str(),
+                            &mut spawned_labels,
+                            &mut debug_overlay_enabled,
+                        );
+                    } else {
+                        update_status(&command_channel, format!("Dropdown {id} -> {selected}"));
+                    }
                 }
                 _ => {}
             }
@@ -289,6 +284,102 @@ fn enqueue(channel: &RemoteCommandChannel, id: &str, method: &str, params: serde
 
 fn update_status(channel: &RemoteCommandChannel, message: String) {
     enqueue(channel, "status", "set_text", json!({ "text": message }));
+}
+
+fn spawn_dynamic_label(channel: &RemoteCommandChannel, index: usize) {
+    let new_id = format!("spawned_label_{index}");
+    let label_text = format!("Dynamic label #{index}");
+    enqueue(
+        channel,
+        &new_id,
+        "create",
+        json!({
+            "kind": "label",
+            "text": label_text,
+            "position": { "x": 0.0, "y": 0.0 },
+            "size": { "width": 260.0, "height": 26.0 },
+            "color": { "r": 0.35, "g": 0.58, "b": 0.92, "a": 0.88 }
+        }),
+    );
+    enqueue(
+        channel,
+        "control_layout",
+        "attach_child",
+        json!({ "child": new_id }),
+    );
+}
+
+fn handle_remote_action_dropdown(
+    channel: &RemoteCommandChannel,
+    action: &str,
+    spawned_labels: &mut usize,
+    debug_overlay_enabled: &mut bool,
+) {
+    match action {
+        "Inspect state" => {
+            let overlay_state = if *debug_overlay_enabled {
+                "enabled"
+            } else {
+                "disabled"
+            };
+            update_status(
+                channel,
+                format!(
+                    "Remote state: {} dynamic labels, debug overlay {}",
+                    *spawned_labels, overlay_state
+                ),
+            );
+        }
+        "Spawn label burst" => {
+            let burst = 3;
+            for _ in 0..burst {
+                *spawned_labels += 1;
+                spawn_dynamic_label(channel, *spawned_labels);
+            }
+            update_status(
+                channel,
+                format!(
+                    "Spawned {} remote labels (total {})",
+                    burst, *spawned_labels
+                ),
+            );
+        }
+        "Toggle debug overlay" => {
+            let new_state = !*debug_overlay_enabled;
+            enqueue(
+                channel,
+                "debug_toggle",
+                "set_checked",
+                json!({ "value": new_state }),
+            );
+            *debug_overlay_enabled = new_state;
+            update_status(
+                channel,
+                format!(
+                    "Debug overlay {} via dropdown",
+                    if new_state { "enabled" } else { "disabled" }
+                ),
+            );
+        }
+        "Focus text box" => {
+            enqueue(
+                channel,
+                "message_box",
+                "set_focused",
+                json!({ "value": true }),
+            );
+            update_status(channel, "Message box focused via dropdown".to_string());
+        }
+        "Reset status message" => {
+            update_status(channel, "Ready. Waiting for stdin commands".to_string());
+        }
+        other => {
+            update_status(
+                channel,
+                format!("Dropdown remote_action_dropdown -> {}", other),
+            );
+        }
+    }
 }
 
 fn bootstrap_scene(channel: &RemoteCommandChannel) {
@@ -367,6 +458,31 @@ fn bootstrap_scene(channel: &RemoteCommandChannel) {
         "control_layout",
         "attach_child",
         json!({ "child": "spawn_button" }),
+    );
+    enqueue(
+        channel,
+        "remote_action_dropdown",
+        "create",
+        json!({
+            "kind": "dropdown",
+            "position": { "x": 0.0, "y": 0.0 },
+            "size": { "width": 240.0, "height": 34.0 },
+            "placeholder": "Select a remote action",
+            "options": [
+                "Inspect state",
+                "Spawn label burst",
+                "Toggle debug overlay",
+                "Focus text box",
+                "Reset status message"
+            ],
+            "max_visible_items": 5
+        }),
+    );
+    enqueue(
+        channel,
+        "control_layout",
+        "attach_child",
+        json!({ "child": "remote_action_dropdown" }),
     );
     enqueue(
         channel,

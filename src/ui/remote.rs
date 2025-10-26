@@ -986,14 +986,14 @@ enum HostedWidget {
 impl HostedWidget {
     fn type_name(&self) -> &'static str {
         match self {
-            HostedWidget::Button(_) => "Button",
-            HostedWidget::Checkbox(_) => "Checkbox",
-            HostedWidget::Label(_) => "Label",
-            HostedWidget::TextBox(_) => "TextBox",
-            HostedWidget::Dropdown(_) => "Dropdown",
-            HostedWidget::Panel(_) => "Panel",
-            HostedWidget::HorizontalLayout(_) => "HorizontalLayout",
-            HostedWidget::VerticalLayout(_) => "VerticalLayout",
+            HostedWidget::Button(widget) => widget.type_name(),
+            HostedWidget::Checkbox(widget) => widget.type_name(),
+            HostedWidget::Label(widget) => widget.type_name(),
+            HostedWidget::TextBox(widget) => widget.type_name(),
+            HostedWidget::Dropdown(widget) => widget.type_name(),
+            HostedWidget::Panel(widget) => widget.type_name(),
+            HostedWidget::HorizontalLayout(widget) => widget.type_name(),
+            HostedWidget::VerticalLayout(widget) => widget.type_name(),
             HostedWidget::Attached(attached) => attached.kind.target_name(),
         }
     }

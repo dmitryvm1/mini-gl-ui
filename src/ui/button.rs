@@ -140,6 +140,10 @@ impl Widget for Button {
         renderer.draw_text(text_pos, self.text_color, &self.label);
     }
 
+    fn type_name(&self) -> &'static str {
+        "Button"
+    }
+
     fn handle_event(&mut self, event: &UiEvent) -> Option<WidgetEvent> {
         match event {
             UiEvent::CursorMoved { position } => {

@@ -266,6 +266,10 @@ impl Widget for Panel {
         }
     }
 
+    fn type_name(&self) -> &'static str {
+        "Panel"
+    }
+
     fn handle_event(&mut self, event: &UiEvent) -> Option<WidgetEvent> {
         match event {
             UiEvent::CursorMoved { position } => {
@@ -315,6 +319,23 @@ impl Widget for Panel {
 
     fn size(&self) -> Vec2 {
         self.size
+    }
+
+    fn contains_point(&self, point: Vec2) -> bool {
+        let within_panel = point.x >= self.position.x
+            && point.x <= self.position.x + self.size.x
+            && point.y >= self.position.y
+            && point.y <= self.position.y + self.size.y;
+        let mut child_contains = false;
+        for c in &self.children {
+            if c.widget.contains_point(point) {
+                child_contains = true;
+                println!("Child hit: {}", c.widget.type_name());
+                break;
+            }
+        }
+        within_panel
+            || child_contains
     }
 }
 

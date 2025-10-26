@@ -259,6 +259,10 @@ impl Widget for HorizontalLayout {
         }
     }
 
+    fn type_name(&self) -> &'static str {
+        "HorizontalLayout"
+    }
+
     fn handle_event(&mut self, event: &UiEvent) -> Option<WidgetEvent> {
         for child in self.children.iter_mut().rev() {
             if let Some(widget_event) = child.handle_event(event) {
@@ -274,6 +278,19 @@ impl Widget for HorizontalLayout {
 
     fn size(&self) -> Vec2 {
         self.size
+    }
+
+    fn contains_point(&self, point: Vec2) -> bool {
+        for child in &self.children {
+            if child.contains_point(point) {
+                return true;
+            }
+        }
+
+        point.x >= self.position.x
+            && point.x <= self.position.x + self.size.x
+            && point.y >= self.position.y
+            && point.y <= self.position.y + self.size.y
     }
 }
 
@@ -474,6 +491,10 @@ impl Widget for VerticalLayout {
         }
     }
 
+    fn type_name(&self) -> &'static str {
+        "VerticalLayout"
+    }
+
     fn handle_event(&mut self, event: &UiEvent) -> Option<WidgetEvent> {
         for child in self.children.iter_mut().rev() {
             if let Some(widget_event) = child.handle_event(event) {
@@ -489,6 +510,19 @@ impl Widget for VerticalLayout {
 
     fn size(&self) -> Vec2 {
         self.size
+    }
+
+    fn contains_point(&self, point: Vec2) -> bool {
+        for child in &self.children {
+            if child.contains_point(point) {
+                return true;
+            }
+        }
+
+        point.x >= self.position.x
+            && point.x <= self.position.x + self.size.x
+            && point.y >= self.position.y
+            && point.y <= self.position.y + self.size.y
     }
 }
 

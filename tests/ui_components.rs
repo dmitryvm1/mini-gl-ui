@@ -942,3 +942,66 @@ fn remote_host_clear_all_removes_widgets() {
     assert!(host.contains("status"));
     assert_eq!(host.len(), 1);
 }
+
+#[test]
+fn remote_host_mouse_hit_includes_panel_children() {
+    let channel = RemoteCommandChannel::new();
+    let mut host = RemoteUiHost::new(channel.clone());
+
+    channel.push(RemoteCommand {
+        id: "panel".to_string(),
+        method: "create".to_string(),
+        params: json!({
+            "kind": "panel",
+            "title": "Settings",
+            "position": { "x": 0.0, "y": 0.0 },
+            "size": { "width": 180.0, "height": 80.0 }
+        }),
+    });
+    channel.push(RemoteCommand {
+        id: "dropdown".to_string(),
+        method: "create".to_string(),
+        params: json!({
+            "kind": "dropdown",
+            "position": { "x": 0.0, "y": 0.0 },
+            "size": { "width": 120.0, "height": 34.0 },
+            "options": ["One", "Two", "Three", "Four", "Five", "Six"]
+        }),
+    });
+
+    let report = host.process();
+    assert!(report.errors.is_empty());
+
+    channel.push(RemoteCommand {
+        id: "panel".to_string(),
+        method: "attach_child".to_string(),
+        params: json!({
+            "child": "dropdown"
+        }),
+    });
+
+    let report = host.process();
+    assert!(report.errors.is_empty());
+
+    channel.push(RemoteCommand {
+        id: "dropdown".to_string(),
+        method: "set_open".to_string(),
+        params: json!({ "value": true }),
+    });
+
+    let report = host.process();
+    assert!(report.errors.is_empty());
+
+    let dropdown_list_position = Vec2::new(24.0, 120.0);
+    let event = UiEvent::MouseButton {
+        button: MouseButton::Left,
+        state: ButtonState::Pressed,
+        position: dropdown_list_position,
+    };
+
+    let (_, mouse_hit) = host.handle_event(&event);
+    assert!(
+        mouse_hit,
+        "expected a click on a dropdown list extending beyond the panel to count as a hit"
+    );
+}

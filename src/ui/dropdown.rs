@@ -202,10 +202,11 @@ impl Dropdown {
 
     fn list_area_contains(&self, point: Vec2) -> bool {
         if let Some((pos, size)) = self.list_bounds() {
-            return point.x >= pos.x
+            let contains = point.x >= pos.x
                 && point.x <= pos.x + size.x
                 && point.y >= pos.y
                 && point.y <= pos.y + size.y;
+            return contains;
         }
         false
     }
@@ -387,6 +388,10 @@ impl Widget for Dropdown {
         }
     }
 
+    fn type_name(&self) -> &'static str {
+        "Dropdown"
+    }
+
     fn handle_event(&mut self, event: &UiEvent) -> Option<WidgetEvent> {
         match event {
             UiEvent::CursorMoved { position } => {
@@ -468,7 +473,9 @@ impl Widget for Dropdown {
     }
 
     fn contains_point(&self, point: Vec2) -> bool {
-        self.main_area_contains(point) || (self.is_open && self.list_area_contains(point))
+        let contains =
+            self.main_area_contains(point) || (self.is_open && self.list_area_contains(point));
+        contains
     }
 }
 

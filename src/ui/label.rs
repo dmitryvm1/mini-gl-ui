@@ -75,6 +75,10 @@ impl Widget for Label {
         renderer.draw_text(text_pos, readable_text_color(fill), &self.text);
     }
 
+    fn type_name(&self) -> &'static str {
+        "Label"
+    }
+
     fn position(&self) -> Vec2 {
         self.position
     }

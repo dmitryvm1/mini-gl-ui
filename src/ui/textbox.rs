@@ -136,6 +136,10 @@ impl Widget for TextBox {
         }
     }
 
+    fn type_name(&self) -> &'static str {
+        "TextBox"
+    }
+
     fn handle_event(&mut self, event: &UiEvent) -> Option<WidgetEvent> {
         match event {
             UiEvent::MouseButton {

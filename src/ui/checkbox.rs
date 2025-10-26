@@ -110,6 +110,10 @@ impl Widget for Checkbox {
         renderer.draw_text(text_pos, colors::TEXT_PRIMARY, &self.label);
     }
 
+    fn type_name(&self) -> &'static str {
+        "Checkbox"
+    }
+
     fn handle_event(&mut self, event: &UiEvent) -> Option<WidgetEvent> {
         match event {
             UiEvent::MouseButton {
