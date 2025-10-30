@@ -5,6 +5,7 @@ use glam::{Vec2, Vec4};
 
 /// A simple text label (renders as a colored box for now)
 pub struct Label {
+    id: String,
     position: Vec2,
     size: Vec2,
     color: Vec4,
@@ -13,12 +14,19 @@ pub struct Label {
 
 impl Label {
     /// Creates a new label
-    pub fn new(position: Vec2, size: Vec2, text: String, color: Vec4) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        position: Vec2,
+        size: Vec2,
+        text: impl Into<String>,
+        color: Vec4,
+    ) -> Self {
         Label {
+            id: id.into(),
             position,
             size,
             color,
-            text,
+            text: text.into(),
         }
     }
 
@@ -49,6 +57,10 @@ impl Label {
 }
 
 impl Widget for Label {
+    fn id(&self) -> &str {
+        &self.id
+    }
+
     fn draw(&self, renderer: &QuadRenderer) {
         let fill = translucent(self.color, 0.68);
         let shadow_offset = Vec2::new(1.0, 2.0);

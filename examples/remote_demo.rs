@@ -170,7 +170,7 @@ fn main() {
 
         for widget_event in emitted_events {
             match widget_event {
-                WidgetEvent::ButtonClicked { label } => {
+                WidgetEvent::ButtonClicked { id: _, label } => {
                     if label == "Spawn Remote Label" {
                         spawned_labels += 1;
                         spawn_dynamic_label(&command_channel, spawned_labels);
@@ -182,7 +182,11 @@ fn main() {
                         update_status(&command_channel, format!("Button '{label}' clicked"));
                     }
                 }
-                WidgetEvent::CheckboxToggled { label, checked } => {
+                WidgetEvent::CheckboxToggled {
+                    id: _,
+                    label,
+                    checked,
+                } => {
                     if label == "Enable debug overlay" {
                         debug_overlay_enabled = checked;
                     }
@@ -194,10 +198,10 @@ fn main() {
                         ),
                     );
                 }
-                WidgetEvent::TextChanged { text } => {
+                WidgetEvent::TextChanged { id: _, text } => {
                     update_status(&command_channel, format!("Typed: {text}"));
                 }
-                WidgetEvent::TextBoxFocusChanged { focused } => {
+                WidgetEvent::TextBoxFocusChanged { id: _, focused } => {
                     let message = if focused {
                         "Text box focused".to_string()
                     } else {
@@ -255,7 +259,7 @@ fn configure_font(renderer: &mut QuadRenderer) {
 
     for path in candidates {
         if let Ok(bytes) = fs::read(path) {
-            if renderer.set_font_from_bytes(&bytes, 18.0).is_ok() {
+            if renderer.set_font_from_bytes(&bytes, 14.0).is_ok() {
                 println!("Loaded font from {path}");
                 return;
             }

@@ -597,7 +597,7 @@ impl RemoteUiHost {
                     .clone()
                     .or_else(|| payload.text.clone())
                     .unwrap_or_else(|| "Button".to_string());
-                let button = Button::new(position, size, label);
+                let button = Button::new(command.id.clone(), position, size, label);
                 self.insert_widget(command.id.clone(), HostedWidget::Button(button));
             }
             "checkbox" => {
@@ -618,7 +618,7 @@ impl RemoteUiHost {
                     .label
                     .clone()
                     .unwrap_or_else(|| "Checkbox".to_string());
-                let mut checkbox = Checkbox::new(position, size, label);
+                let mut checkbox = Checkbox::new(command.id.clone(), position, size, label);
                 if let Some(checked) = payload.checked {
                     checkbox.set_checked(checked);
                 }
@@ -644,7 +644,7 @@ impl RemoteUiHost {
                     .clone()
                     .map(|c| c.into_vec4())
                     .unwrap_or(colors::ACCENT_SOFT);
-                let label_widget = Label::new(position, size, text, color);
+                let label_widget = Label::new(command.id.clone(), position, size, text, color);
                 self.insert_widget(command.id.clone(), HostedWidget::Label(label_widget));
             }
             "textbox" => {
@@ -665,7 +665,7 @@ impl RemoteUiHost {
                     .placeholder
                     .clone()
                     .unwrap_or_else(|| "Type here...".to_string());
-                let mut textbox = TextBox::new(position, size, placeholder);
+                let mut textbox = TextBox::new(command.id.clone(), position, size, placeholder);
                 if let Some(value) = payload.text.clone() {
                     textbox.set_text(value);
                 }
@@ -716,7 +716,7 @@ impl RemoteUiHost {
                     })
                     .into_vec2();
                 let title = payload.title.clone().unwrap_or_else(|| "Panel".to_string());
-                let panel = Panel::new(position, size, title);
+                let panel = Panel::new(command.id.clone(), position, size, title);
                 self.insert_widget(command.id.clone(), HostedWidget::Panel(panel));
             }
             "horizontal_layout" => {
@@ -725,7 +725,7 @@ impl RemoteUiHost {
                     .clone()
                     .unwrap_or_else(|| PositionPayload { x: 0.0, y: 0.0 })
                     .into_vec2();
-                let layout = HorizontalLayout::new(position);
+                let layout = HorizontalLayout::new(command.id.clone(), position);
                 self.insert_widget(command.id.clone(), HostedWidget::HorizontalLayout(layout));
             }
             "vertical_layout" => {
@@ -734,7 +734,7 @@ impl RemoteUiHost {
                     .clone()
                     .unwrap_or_else(|| PositionPayload { x: 0.0, y: 0.0 })
                     .into_vec2();
-                let layout = VerticalLayout::new(position);
+                let layout = VerticalLayout::new(command.id.clone(), position);
                 self.insert_widget(command.id.clone(), HostedWidget::VerticalLayout(layout));
             }
             _ => {

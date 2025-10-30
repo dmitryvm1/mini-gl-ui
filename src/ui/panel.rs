@@ -5,6 +5,7 @@ use glam::{Vec2, Vec4};
 
 /// A draggable panel that can contain other widgets and be collapsed or expanded.
 pub struct Panel {
+    id: String,
     position: Vec2,
     size: Vec2,
     expanded_size: Vec2,
@@ -22,15 +23,21 @@ pub struct Panel {
 
 impl Panel {
     /// Creates a new panel
-    pub fn new(position: Vec2, size: Vec2, title: String) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        position: Vec2,
+        size: Vec2,
+        title: impl Into<String>,
+    ) -> Self {
         let title_bar_height = 30.0;
         let min_height = title_bar_height + 4.0;
         let expanded_size = Vec2::new(size.x.max(0.0), size.y.max(min_height));
         Panel {
+            id: id.into(),
             position,
             size: expanded_size,
             expanded_size,
-            title,
+            title: title.into(),
             title_bar_height,
             background_color: translucent(colors::SURFACE_DARK, 0.72),
             title_bar_color: translucent(colors::ACCENT, 0.9),
@@ -294,6 +301,10 @@ impl Panel {
 }
 
 impl Widget for Panel {
+    fn id(&self) -> &str {
+        &self.id
+    }
+
     fn draw(&self, renderer: &QuadRenderer) {
         let shadow_offset = Vec2::new(3.0, 4.0);
         renderer.draw_rect(self.position + shadow_offset, self.size, colors::SHADOW);
@@ -364,6 +375,7 @@ impl Widget for Panel {
                 if self.is_dragging {
                     self.update_drag(*position);
                     return Some(WidgetEvent::PanelDragged {
+                        id: self.id.clone(),
                         position: self.position,
                     });
                 }
@@ -382,12 +394,15 @@ impl Widget for Panel {
                         if self.toggle_button_contains_point(*position) {
                             self.toggle_collapsed();
                             return Some(WidgetEvent::PanelToggleChanged {
+                                id: self.id.clone(),
                                 collapsed: self.is_collapsed,
                             });
                         }
                         if self.title_bar_contains_point(*position) {
                             self.start_drag(*position);
-                            Some(WidgetEvent::PanelDragStarted)
+                            Some(WidgetEvent::PanelDragStarted {
+                                id: self.id.clone(),
+                            })
                         } else {
                             self.dispatch_event_to_children(event)
                         }
@@ -396,7 +411,9 @@ impl Widget for Panel {
                         let child_event = self.dispatch_event_to_children(event);
                         if self.is_dragging {
                             self.stop_drag();
-                            child_event.or(Some(WidgetEvent::PanelDragEnded))
+                            child_event.or(Some(WidgetEvent::PanelDragEnded {
+                                id: self.id.clone(),
+                            }))
                         } else {
                             child_event
                         }

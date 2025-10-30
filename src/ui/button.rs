@@ -5,6 +5,7 @@ use glam::{Vec2, Vec4};
 
 /// A clickable button
 pub struct Button {
+    id: String,
     position: Vec2,
     size: Vec2,
     label: String,
@@ -19,11 +20,17 @@ pub struct Button {
 
 impl Button {
     /// Creates a new button
-    pub fn new(position: Vec2, size: Vec2, label: String) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        position: Vec2,
+        size: Vec2,
+        label: impl Into<String>,
+    ) -> Self {
         Button {
+            id: id.into(),
             position,
             size,
-            label,
+            label: label.into(),
             normal_color: translucent(colors::SURFACE_LIGHT, 0.8),
             hover_color: translucent(colors::ACCENT_SOFT, 0.82),
             pressed_color: translucent(colors::ACCENT, 0.88),
@@ -107,6 +114,10 @@ impl Button {
 }
 
 impl Widget for Button {
+    fn id(&self) -> &str {
+        &self.id
+    }
+
     fn draw(&self, renderer: &QuadRenderer) {
         let color = self.current_color();
         // Soft drop shadow keeps background subtly visible underneath
@@ -170,6 +181,7 @@ impl Widget for Button {
                         self.set_pressed(false);
                         if was_pressed && self.contains_point(*position) {
                             Some(WidgetEvent::ButtonClicked {
+                                id: self.id.clone(),
                                 label: self.label.clone(),
                             })
                         } else {

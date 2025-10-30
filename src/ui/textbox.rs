@@ -5,6 +5,7 @@ use glam::{Vec2, Vec4};
 
 /// A text input box
 pub struct TextBox {
+    id: String,
     position: Vec2,
     size: Vec2,
     text: String,
@@ -15,12 +16,18 @@ pub struct TextBox {
 
 impl TextBox {
     /// Creates a new text box
-    pub fn new(position: Vec2, size: Vec2, placeholder: String) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        position: Vec2,
+        size: Vec2,
+        placeholder: impl Into<String>,
+    ) -> Self {
         TextBox {
+            id: id.into(),
             position,
             size,
             text: String::new(),
-            _placeholder: placeholder,
+            _placeholder: placeholder.into(),
             is_focused: false,
             cursor_position: 0,
         }
@@ -78,6 +85,10 @@ impl TextBox {
 }
 
 impl Widget for TextBox {
+    fn id(&self) -> &str {
+        &self.id
+    }
+
     fn draw(&self, renderer: &QuadRenderer) {
         let base_bg = if self.is_focused {
             colors::SURFACE_LIGHT
@@ -152,7 +163,10 @@ impl Widget for TextBox {
                     let focus_changed = new_focus != self.is_focused;
                     self.set_focused(new_focus);
                     if focus_changed {
-                        return Some(WidgetEvent::TextBoxFocusChanged { focused: new_focus });
+                        return Some(WidgetEvent::TextBoxFocusChanged {
+                            id: self.id.clone(),
+                            focused: new_focus,
+                        });
                     }
                 }
                 None
@@ -161,6 +175,7 @@ impl Widget for TextBox {
                 if self.is_focused {
                     self.insert_char(*ch);
                     Some(WidgetEvent::TextChanged {
+                        id: self.id.clone(),
                         text: self.text.clone(),
                     })
                 } else {
@@ -173,6 +188,7 @@ impl Widget for TextBox {
                         KeyCode::Backspace => {
                             self.backspace();
                             Some(WidgetEvent::TextChanged {
+                                id: self.id.clone(),
                                 text: self.text.clone(),
                             })
                         }

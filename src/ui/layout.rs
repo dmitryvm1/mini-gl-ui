@@ -60,6 +60,7 @@ impl<'a> Iterator for LayoutChildrenMut<'a> {
 
 /// A layout that arranges children horizontally.
 pub struct HorizontalLayout {
+    id: String,
     position: Vec2,
     size: Vec2,
     spacing: f32,
@@ -70,8 +71,9 @@ pub struct HorizontalLayout {
 
 impl HorizontalLayout {
     /// Creates a new horizontal layout at the given position.
-    pub fn new(position: Vec2) -> Self {
+    pub fn new(id: impl Into<String>, position: Vec2) -> Self {
         let mut layout = Self {
+            id: id.into(),
             position,
             size: Vec2::ZERO,
             spacing: 12.0,
@@ -253,6 +255,10 @@ impl HorizontalLayout {
 }
 
 impl Widget for HorizontalLayout {
+    fn id(&self) -> &str {
+        &self.id
+    }
+
     fn draw(&self, renderer: &QuadRenderer) {
         for child in &self.children {
             child.draw(renderer);
@@ -310,6 +316,7 @@ impl LayoutElement for HorizontalLayout {
 
 /// A layout that arranges children vertically.
 pub struct VerticalLayout {
+    id: String,
     position: Vec2,
     size: Vec2,
     spacing: f32,
@@ -320,8 +327,9 @@ pub struct VerticalLayout {
 
 impl VerticalLayout {
     /// Creates a new vertical layout at the given position.
-    pub fn new(position: Vec2) -> Self {
+    pub fn new(id: impl Into<String>, position: Vec2) -> Self {
         let mut layout = Self {
+            id: id.into(),
             position,
             size: Vec2::ZERO,
             spacing: 12.0,
@@ -485,6 +493,10 @@ impl VerticalLayout {
 }
 
 impl Widget for VerticalLayout {
+    fn id(&self) -> &str {
+        &self.id
+    }
+
     fn draw(&self, renderer: &QuadRenderer) {
         for child in &self.children {
             child.draw(renderer);

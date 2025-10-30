@@ -629,28 +629,32 @@ fn main() {
 
     // Create UI components
     let mut label = Label::new(
+        "main_label",
         Vec2::new(50.0, 50.0),
         Vec2::new(200.0, 40.0),
-        "Label \n multiline".to_string(),
+        "Label \n multiline",
         colors::ACCENT_SOFT,
     );
 
     let mut button = Button::new(
+        "primary_button",
         Vec2::new(50.0, 110.0),
         Vec2::new(150.0, 40.0),
-        "Click Me".to_string(),
+        "Click Me",
     );
 
     let mut checkbox = Checkbox::new(
+        "primary_checkbox",
         Vec2::new(50.0, 170.0),
         Vec2::new(30.0, 30.0),
-        "Checkbox".to_string(),
+        "Checkbox",
     );
 
     let mut textbox = TextBox::new(
+        "chat_textbox",
         Vec2::new(50.0, 220.0),
         Vec2::new(200.0, 40.0),
-        "Enter text...".to_string(),
+        "Enter text...",
     );
 
     let mut dropdown = Dropdown::new(
@@ -672,80 +676,92 @@ fn main() {
     .with_max_visible_items(4);
 
     let mut panel = Panel::new(
+        "main_panel",
         Vec2::new(300.0, 50.0),
         Vec2::new(400.0, 300.0),
-        "Draggable Panel".to_string(),
+        "Draggable Panel",
     )
     .with_colors(colors::SURFACE_DARK, colors::ACCENT)
     .with_padding(Vec2::new(18.0, 16.0));
 
-    let mut panel_controls_row = HorizontalLayout::new(Vec2::ZERO).with_spacing(12.0);
+    let mut panel_controls_row =
+        HorizontalLayout::new("panel_controls", Vec2::ZERO).with_spacing(12.0);
     panel_controls_row.add_child(Button::new(
+        "apply_buff_button",
         Vec2::ZERO,
         Vec2::new(120.0, 34.0),
-        "Apply Buff".to_string(),
+        "Apply Buff",
     ));
     panel_controls_row.add_child(Button::new(
+        "clear_buff_button",
         Vec2::ZERO,
         Vec2::new(120.0, 34.0),
-        "Clear Buff".to_string(),
+        "Clear Buff",
     ));
 
-    let mut panel_layout = VerticalLayout::new(Vec2::ZERO)
+    let mut panel_layout = VerticalLayout::new("panel_layout", Vec2::ZERO)
         .with_spacing(12.0)
         .with_cross_alignment(CrossAlignment::Start);
     panel_layout.add_child(Label::new(
+        "panel_title",
         Vec2::ZERO,
         Vec2::new(260.0, 28.0),
-        "Raid Controls".to_string(),
+        "Raid Controls",
         colors::ACCENT_SOFT,
     ));
     panel_layout.add_child(Label::new(
+        "panel_subtitle",
         Vec2::ZERO,
         Vec2::new(300.0, 24.0),
-        "Toggle quick options directly inside the panel:".to_string(),
+        "Toggle quick options directly inside the panel:",
         colors::TEXT_SECONDARY,
     ));
     panel_layout.add_child(Checkbox::new(
+        "overlay_checkbox",
         Vec2::ZERO,
         Vec2::new(26.0, 26.0),
-        "Enable overlay markers".to_string(),
+        "Enable overlay markers",
     ));
     panel_layout.add_child(Checkbox::new(
+        "lock_position_checkbox",
         Vec2::ZERO,
         Vec2::new(26.0, 26.0),
-        "Lock panel position".to_string(),
+        "Lock panel position",
     ));
     panel_layout.add_child(panel_controls_row);
 
     panel.add_child(panel_layout, Vec2::ZERO);
 
-    let mut action_row = HorizontalLayout::new(Vec2::ZERO).with_spacing(12.0);
+    let mut action_row = HorizontalLayout::new("action_row", Vec2::ZERO).with_spacing(12.0);
     action_row.add_child(Button::new(
+        "accept_button",
         Vec2::ZERO,
         Vec2::new(120.0, 36.0),
-        "Accept".to_string(),
+        "Accept",
     ));
     action_row.add_child(Button::new(
+        "decline_button",
         Vec2::ZERO,
         Vec2::new(120.0, 36.0),
-        "Decline".to_string(),
+        "Decline",
     ));
 
-    let mut layout_section = VerticalLayout::new(Vec2::new(320.0, 380.0))
+    let mut layout_section = VerticalLayout::new("layout_section", Vec2::new(320.0, 380.0))
         .with_spacing(14.0)
         .with_cross_alignment(CrossAlignment::Center);
     layout_section.add_child(Label::new(
+        "party_title",
         Vec2::ZERO,
         Vec2::new(260.0, 32.0),
-        "Party Actions".to_string(),
+        "Party Actions",
         colors::ACCENT_SOFT,
     ));
     layout_section.add_child(action_row);
     layout_section.add_child(Checkbox::new(
+        "remember_choice_checkbox",
         Vec2::ZERO,
         Vec2::new(26.0, 26.0),
-        "Remember choice".to_string(),
+        "Remember choice",
     ));
 
     let background_texture = create_mmo_background_texture(WINDOW_WIDTH, WINDOW_HEIGHT);
@@ -871,33 +887,46 @@ fn main() {
             for widget_event in emitted_events {
                 match widget_event {
                     WidgetEvent::ButtonClicked {
+                        id,
                         label: button_label,
                     } => {
-                        println!("Button '{button_label}' clicked!");
+                        println!("Button {id} ('{button_label}') clicked!");
                     }
                     WidgetEvent::CheckboxToggled {
+                        id,
                         label: checkbox_label,
                         checked,
                     } => {
-                        println!("Checkbox '{checkbox_label}' is now: {checked}");
+                        println!("Checkbox {id} ('{checkbox_label}') is now: {checked}");
                     }
-                    WidgetEvent::TextChanged { text } => {
+                    WidgetEvent::TextChanged { id, text } => {
                         typed_text = text;
                         label.set_text(format!("Text: {} | Class: {}", typed_text, selected_class));
+                        println!("TextBox {id} changed to '{typed_text}'");
                     }
-                    WidgetEvent::TextBoxFocusChanged { focused } => {
-                        println!("TextBox {}", if focused { "focused" } else { "unfocused" });
+                    WidgetEvent::TextBoxFocusChanged { id, focused } => {
+                        println!(
+                            "TextBox {id} {}",
+                            if focused { "focused" } else { "unfocused" }
+                        );
                     }
                     WidgetEvent::DropdownSelectionChanged { id, selected } => {
                         selected_class = selected;
                         label.set_text(format!("Text: {} | Class: {}", typed_text, selected_class));
                         println!("Dropdown '{id}' selected '{selected_class}'");
                     }
-                    WidgetEvent::PanelDragStarted => println!("Started dragging panel"),
+                    WidgetEvent::PanelDragStarted { id } => {
+                        println!("Started dragging panel {id}");
+                    }
                     WidgetEvent::PanelDragged { .. } => {}
-                    WidgetEvent::PanelDragEnded => println!("Stopped dragging panel"),
-                    WidgetEvent::PanelToggleChanged { collapsed } => {
-                        println!("Panel {}", if collapsed { "collapsed" } else { "expanded" });
+                    WidgetEvent::PanelDragEnded { id } => {
+                        println!("Stopped dragging panel {id}");
+                    }
+                    WidgetEvent::PanelToggleChanged { id, collapsed } => {
+                        println!(
+                            "Panel {id} {}",
+                            if collapsed { "collapsed" } else { "expanded" }
+                        );
                     }
                 }
             }

@@ -4,9 +4,10 @@ use serde_json::json;
 #[test]
 fn test_button_creation() {
     let button = Button::new(
+        "button_creation",
         Vec2::new(10.0, 20.0),
         Vec2::new(100.0, 40.0),
-        "Test".to_string(),
+        "Test",
     );
 
     assert_eq!(button.position(), Vec2::new(10.0, 20.0));
@@ -18,9 +19,10 @@ fn test_button_creation() {
 #[test]
 fn test_button_state() {
     let mut button = Button::new(
+        "button_state",
         Vec2::new(0.0, 0.0),
         Vec2::new(100.0, 40.0),
-        "Test".to_string(),
+        "Test",
     );
 
     button.set_pressed(true);
@@ -33,9 +35,10 @@ fn test_button_state() {
 #[test]
 fn test_checkbox_toggle() {
     let mut checkbox = Checkbox::new(
+        "checkbox_toggle",
         Vec2::new(10.0, 10.0),
         Vec2::new(20.0, 20.0),
-        "Option".to_string(),
+        "Option",
     );
 
     assert!(!checkbox.is_checked());
@@ -50,9 +53,10 @@ fn test_checkbox_toggle() {
 #[test]
 fn test_textbox_text_input() {
     let mut textbox = TextBox::new(
+        "textbox_input",
         Vec2::new(0.0, 0.0),
         Vec2::new(200.0, 30.0),
-        "Placeholder".to_string(),
+        "Placeholder",
     );
 
     assert_eq!(textbox.text(), "");
@@ -68,9 +72,10 @@ fn test_textbox_text_input() {
 #[test]
 fn test_panel_dragging() {
     let mut panel = Panel::new(
+        "panel_dragging",
         Vec2::new(100.0, 100.0),
         Vec2::new(300.0, 200.0),
-        "Panel".to_string(),
+        "Panel",
     );
 
     assert!(!panel.is_dragging());
@@ -88,9 +93,10 @@ fn test_panel_dragging() {
 #[test]
 fn test_label_creation() {
     let mut label = Label::new(
+        "label_creation",
         Vec2::new(5.0, 5.0),
         Vec2::new(100.0, 20.0),
-        "Label".to_string(),
+        "Label",
         colors::BLUE,
     );
 
@@ -103,9 +109,10 @@ fn test_label_creation() {
 #[test]
 fn test_widget_contains_point() {
     let button = Button::new(
+        "button_hit_test",
         Vec2::new(10.0, 10.0),
         Vec2::new(100.0, 50.0),
-        "Test".to_string(),
+        "Test",
     );
 
     // Point inside
@@ -123,9 +130,10 @@ fn test_widget_contains_point() {
 #[test]
 fn test_panel_title_bar_hit_detection() {
     let panel = Panel::new(
+        "panel_hit_test",
         Vec2::new(100.0, 100.0),
         Vec2::new(200.0, 150.0),
-        "Panel".to_string(),
+        "Panel",
     );
 
     // Point in title bar
@@ -141,9 +149,10 @@ fn test_panel_title_bar_hit_detection() {
 #[test]
 fn panel_collapsing_updates_height() {
     let mut panel = Panel::new(
+        "panel_collapse",
         Vec2::new(50.0, 50.0),
         Vec2::new(180.0, 140.0),
-        "Panel".to_string(),
+        "Panel",
     );
 
     let expanded_height = panel.size().y;
@@ -162,9 +171,10 @@ fn panel_collapsing_updates_height() {
 #[test]
 fn panel_toggle_button_emits_event() {
     let mut panel = Panel::new(
+        "panel_toggle",
         Vec2::new(25.0, 25.0),
         Vec2::new(220.0, 160.0),
-        "Panel".to_string(),
+        "Panel",
     );
     let toggle_point = Vec2::new(
         panel.position().x + 15.0,
@@ -176,7 +186,7 @@ fn panel_toggle_button_emits_event() {
         position: toggle_point,
     });
     match event {
-        Some(WidgetEvent::PanelToggleChanged { collapsed }) => assert!(collapsed),
+        Some(WidgetEvent::PanelToggleChanged { id: _, collapsed }) => assert!(collapsed),
         other => panic!("expected toggle event, got {:?}", other),
     }
     assert!(panel.is_collapsed());
@@ -185,9 +195,10 @@ fn panel_toggle_button_emits_event() {
 #[test]
 fn test_button_handle_event_emits_click() {
     let mut button = Button::new(
+        "button_handle_event",
         Vec2::new(0.0, 0.0),
         Vec2::new(100.0, 40.0),
-        "Click".to_string(),
+        "Click",
     );
 
     button.handle_event(&UiEvent::CursorMoved {
@@ -205,7 +216,7 @@ fn test_button_handle_event_emits_click() {
     });
 
     match release_event {
-        Some(WidgetEvent::ButtonClicked { label }) => assert_eq!(label, "Click"),
+        Some(WidgetEvent::ButtonClicked { id: _, label }) => assert_eq!(label, "Click"),
         other => panic!("Unexpected event: {:?}", other),
     }
 }
@@ -213,9 +224,10 @@ fn test_button_handle_event_emits_click() {
 #[test]
 fn test_checkbox_handle_event_toggles() {
     let mut checkbox = Checkbox::new(
+        "checkbox_event",
         Vec2::new(10.0, 10.0),
         Vec2::new(20.0, 20.0),
-        "Option".to_string(),
+        "Option",
     );
 
     let event = checkbox.handle_event(&UiEvent::MouseButton {
@@ -225,7 +237,11 @@ fn test_checkbox_handle_event_toggles() {
     });
     assert!(checkbox.is_checked());
     match event {
-        Some(WidgetEvent::CheckboxToggled { label, checked }) => {
+        Some(WidgetEvent::CheckboxToggled {
+            id: _,
+            label,
+            checked,
+        }) => {
             assert_eq!(label, "Option");
             assert!(checked);
         }
@@ -236,9 +252,10 @@ fn test_checkbox_handle_event_toggles() {
 #[test]
 fn test_textbox_handle_event_updates_text() {
     let mut textbox = TextBox::new(
+        "textbox_events",
         Vec2::new(0.0, 0.0),
         Vec2::new(200.0, 30.0),
-        "Placeholder".to_string(),
+        "Placeholder",
     );
 
     let focus_event = textbox.handle_event(&UiEvent::MouseButton {
@@ -249,13 +266,16 @@ fn test_textbox_handle_event_updates_text() {
     assert!(textbox.is_focused());
     assert!(matches!(
         focus_event,
-        Some(WidgetEvent::TextBoxFocusChanged { focused: true })
+        Some(WidgetEvent::TextBoxFocusChanged {
+            id: _,
+            focused: true
+        })
     ));
 
     let text_event = textbox.handle_event(&UiEvent::CharacterInput('A'));
     assert_eq!(textbox.text(), "A");
     match text_event {
-        Some(WidgetEvent::TextChanged { text }) => assert_eq!(text, "A"),
+        Some(WidgetEvent::TextChanged { id: _, text }) => assert_eq!(text, "A"),
         other => panic!("Unexpected event: {:?}", other),
     }
 }
@@ -263,9 +283,10 @@ fn test_textbox_handle_event_updates_text() {
 #[test]
 fn test_textbox_repeated_backspace_events() {
     let mut textbox = TextBox::new(
+        "textbox_backspace",
         Vec2::new(0.0, 0.0),
         Vec2::new(200.0, 30.0),
-        "Placeholder".to_string(),
+        "Placeholder",
     );
 
     textbox.set_focused(true);
@@ -367,9 +388,10 @@ fn test_dropdown_scroll_and_select_lower_option() {
 #[test]
 fn test_panel_handle_event_drag_flow() {
     let mut panel = Panel::new(
+        "panel_drag_flow",
         Vec2::new(100.0, 100.0),
         Vec2::new(200.0, 150.0),
-        "Panel".to_string(),
+        "Panel",
     );
 
     let start_event = panel.handle_event(&UiEvent::MouseButton {
@@ -377,14 +399,17 @@ fn test_panel_handle_event_drag_flow() {
         state: ButtonState::Pressed,
         position: Vec2::new(150.0, 110.0),
     });
-    assert!(matches!(start_event, Some(WidgetEvent::PanelDragStarted)));
+    assert!(matches!(
+        start_event,
+        Some(WidgetEvent::PanelDragStarted { id: _ })
+    ));
 
     let drag_event = panel.handle_event(&UiEvent::CursorMoved {
         position: Vec2::new(200.0, 160.0),
     });
     assert!(matches!(
         drag_event,
-        Some(WidgetEvent::PanelDragged { position })
+        Some(WidgetEvent::PanelDragged { id: _, position })
             if position == panel.position()
     ));
 
@@ -393,21 +418,26 @@ fn test_panel_handle_event_drag_flow() {
         state: ButtonState::Released,
         position: Vec2::new(200.0, 160.0),
     });
-    assert!(matches!(stop_event, Some(WidgetEvent::PanelDragEnded)));
+    assert!(matches!(
+        stop_event,
+        Some(WidgetEvent::PanelDragEnded { id: _ })
+    ));
 }
 
 #[test]
 fn panel_child_receives_events() {
     let mut panel = Panel::new(
+        "panel_child_events",
         Vec2::new(80.0, 80.0),
         Vec2::new(260.0, 200.0),
-        "Panel".to_string(),
+        "Panel",
     );
     panel.add_child(
         Button::new(
+            "inner_action_button",
             Vec2::ZERO,
             Vec2::new(120.0, 36.0),
-            "Inner Action".to_string(),
+            "Inner Action",
         ),
         Vec2::new(24.0, 32.0),
     );
@@ -432,7 +462,7 @@ fn panel_child_receives_events() {
     });
 
     match release_event {
-        Some(WidgetEvent::ButtonClicked { label }) => assert_eq!(label, "Inner Action"),
+        Some(WidgetEvent::ButtonClicked { id: _, label }) => assert_eq!(label, "Inner Action"),
         other => panic!("Unexpected event: {:?}", other),
     }
 }
@@ -440,15 +470,17 @@ fn panel_child_receives_events() {
 #[test]
 fn panel_drag_moves_children() {
     let mut panel = Panel::new(
+        "panel_child_motion",
         Vec2::new(120.0, 90.0),
         Vec2::new(240.0, 180.0),
-        "Panel".to_string(),
+        "Panel",
     );
     panel.add_child(
         Label::new(
+            "inner_label",
             Vec2::ZERO,
             Vec2::new(60.0, 18.0),
-            "Inside".to_string(),
+            "Inside",
             colors::ACCENT_SOFT,
         ),
         Vec2::new(18.0, 24.0),
@@ -468,21 +500,23 @@ fn panel_drag_moves_children() {
 
 #[test]
 fn horizontal_layout_positions_children() {
-    let mut layout = HorizontalLayout::new(Vec2::new(10.0, 20.0))
+    let mut layout = HorizontalLayout::new("horizontal_layout", Vec2::new(10.0, 20.0))
         .with_padding(Vec2::new(4.0, 6.0))
         .with_spacing(5.0)
         .with_cross_alignment(CrossAlignment::Center);
 
     layout.add_child(Label::new(
+        "layout_label",
         Vec2::ZERO,
         Vec2::new(40.0, 16.0),
-        "Label".to_string(),
+        "Label",
         colors::BLUE,
     ));
     layout.add_child(Button::new(
+        "layout_button",
         Vec2::ZERO,
         Vec2::new(24.0, 30.0),
-        "Btn".to_string(),
+        "Btn",
     ));
 
     let first = layout.child(0).expect("layout should have first child");
@@ -495,17 +529,19 @@ fn horizontal_layout_positions_children() {
 
 #[test]
 fn vertical_layout_forwards_button_click() {
-    let mut layout = VerticalLayout::new(Vec2::ZERO).with_spacing(4.0);
+    let mut layout = VerticalLayout::new("vertical_layout", Vec2::ZERO).with_spacing(4.0);
 
     layout.add_child(Checkbox::new(
+        "layout_checkbox",
         Vec2::ZERO,
         Vec2::new(20.0, 20.0),
-        "Check".to_string(),
+        "Check",
     ));
     layout.add_child(Button::new(
+        "layout_action_button",
         Vec2::ZERO,
         Vec2::new(80.0, 24.0),
-        "Action".to_string(),
+        "Action",
     ));
 
     let click_point = Vec2::new(18.0, 44.0);
@@ -522,7 +558,7 @@ fn vertical_layout_forwards_button_click() {
     });
 
     match release_event {
-        Some(WidgetEvent::ButtonClicked { label }) => assert_eq!(label, "Action"),
+        Some(WidgetEvent::ButtonClicked { id: _, label }) => assert_eq!(label, "Action"),
         other => panic!("Unexpected event: {:?}", other),
     }
 }
@@ -546,7 +582,7 @@ fn remote_commands_update_button() {
         params: json!({ "text": "Remote".to_string() }),
     });
 
-    let mut button = Button::new(Vec2::ZERO, Vec2::new(80.0, 24.0), "Initial".to_string());
+    let mut button = Button::new("primary", Vec2::ZERO, Vec2::new(80.0, 24.0), "Initial");
 
     let report = RemoteUiSession::new(&channel)
         .with_button("primary", &mut button)
@@ -572,7 +608,7 @@ fn remote_unknown_target_reports_error() {
         params: json!({ "x": 10.0, "y": 10.0 }),
     });
 
-    let mut checkbox = Checkbox::new(Vec2::ZERO, Vec2::new(18.0, 18.0), "Check".to_string());
+    let mut checkbox = Checkbox::new("existing", Vec2::ZERO, Vec2::new(18.0, 18.0), "Check");
     let report = RemoteUiSession::new(&channel)
         .with_checkbox("existing", &mut checkbox)
         .process();
@@ -658,7 +694,7 @@ fn remote_host_attaches_button_to_layout() {
     assert!(
         events.iter().any(|event| matches!(
             event,
-            WidgetEvent::ButtonClicked { label } if label == "Remote Button"
+            WidgetEvent::ButtonClicked { id: _, label } if label == "Remote Button"
         )),
         "attached button did not emit click event"
     );
@@ -750,11 +786,12 @@ fn remote_updates_layout_parameters() {
         params: json!({ "alignment": "center" }),
     });
 
-    let mut layout = HorizontalLayout::new(Vec2::ZERO);
+    let mut layout = HorizontalLayout::new("layout", Vec2::ZERO);
     layout.add_child(Label::new(
+        "layout_label",
         Vec2::ZERO,
         Vec2::new(40.0, 16.0),
-        "L1".to_string(),
+        "L1",
         colors::BLUE,
     ));
 

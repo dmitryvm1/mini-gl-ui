@@ -58,7 +58,7 @@ All UI components implement the `Widget` trait ([src/ui/mod.rs](src/ui/mod.rs)):
 ### Event System
 Two parallel event flows:
 1. **UiEvent** (input): `CursorMoved`, `MouseButton`, `Scroll`, `CharacterInput`, `KeyInput` - consumed by widgets via `handle_event()`
-2. **WidgetEvent** (output): `ButtonClicked`, `CheckboxToggled`, `TextChanged`, `DropdownSelectionChanged`, `PanelDragStarted/Dragged/Ended`, `PanelToggleChanged` - emitted by widgets to notify application logic
+2. **WidgetEvent** (output): `ButtonClicked`, `CheckboxToggled`, `TextChanged`, `DropdownSelectionChanged`, `PanelDragStarted/Dragged/Ended`, `PanelToggleChanged` - emitted by widgets to notify application logic. Every variant now includes the widget's `id` for correlation.
 
 ### Remote Control Interface
 The remote interface ([src/ui/remote.rs](src/ui/remote.rs)) provides runtime control of widgets via JSON commands over IPC/sockets:
@@ -117,13 +117,18 @@ renderer.set_projection(&projection);
 ```rust
 use mini_gl_ui::{ui::*, Vec2, colors};
 
-let mut button = Button::new(Vec2::new(10.0, 10.0), Vec2::new(100.0, 40.0), "Click".to_string());
+let mut button = Button::new(
+    "example_button",
+    Vec2::new(10.0, 10.0),
+    Vec2::new(100.0, 40.0),
+    "Click",
+);
 button.draw(&renderer);
 
 // Handle events
 if let Some(event) = button.handle_event(&UiEvent::MouseButton { ... }) {
     match event {
-        WidgetEvent::ButtonClicked { label } => println!("Clicked: {}", label),
+        WidgetEvent::ButtonClicked { id, label } => println!("Clicked {id}: {label}"),
         _ => {}
     }
 }
@@ -131,12 +136,23 @@ if let Some(event) = button.handle_event(&UiEvent::MouseButton { ... }) {
 
 ### Using Layouts
 ```rust
-let mut layout = VerticalLayout::new(Vec2::new(10.0, 20.0))
+let mut layout = VerticalLayout::new("example_layout", Vec2::new(10.0, 20.0))
     .with_spacing(8.0)
     .with_padding(Vec2::new(12.0, 12.0));
 
-layout.add_child(Button::new(Vec2::ZERO, Vec2::new(120.0, 36.0), "Btn1".to_string()));
-layout.add_child(Label::new(Vec2::ZERO, Vec2::new(80.0, 20.0), "Text".to_string(), colors::BLUE));
+layout.add_child(Button::new(
+    "layout_button",
+    Vec2::ZERO,
+    Vec2::new(120.0, 36.0),
+    "Btn1",
+));
+layout.add_child(Label::new(
+    "layout_label",
+    Vec2::ZERO,
+    Vec2::new(80.0, 20.0),
+    "Text",
+    colors::BLUE,
+));
 
 layout.draw(&renderer); // Draws all children at calculated positions
 ```
@@ -153,7 +169,7 @@ channel.push(RemoteCommand {
     params: json!({ "text": "New Label" }),
 });
 
-let mut button = Button::new(...);
+let mut button = Button::new("my_button", ...);
 let report = RemoteUiSession::new(&channel)
     .with_button("my_button", &mut button)
     .process();

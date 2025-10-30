@@ -52,21 +52,24 @@ renderer.set_projection(&projection);
 
 // Create UI components
 let button = Button::new(
+    "primary_button",
     Vec2::new(50.0, 50.0),
     Vec2::new(150.0, 40.0),
-    "Click Me".to_string(),
+    "Click Me",
 );
 
 let checkbox = Checkbox::new(
+    "option_checkbox",
     Vec2::new(50.0, 110.0),
     Vec2::new(30.0, 30.0),
-    "Option".to_string(),
+    "Option",
 );
 
 let mut panel = Panel::new(
+    "main_panel",
     Vec2::new(250.0, 50.0),
     Vec2::new(400.0, 300.0),
-    "My Panel".to_string(),
+    "My Panel",
 );
 
 // In your render loop:

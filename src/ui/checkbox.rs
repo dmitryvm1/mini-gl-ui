@@ -5,6 +5,7 @@ use glam::{Vec2, Vec4};
 
 /// A checkbox that can be checked or unchecked
 pub struct Checkbox {
+    id: String,
     position: Vec2,
     size: Vec2,
     checked: bool,
@@ -13,12 +14,18 @@ pub struct Checkbox {
 
 impl Checkbox {
     /// Creates a new checkbox
-    pub fn new(position: Vec2, size: Vec2, label: String) -> Self {
+    pub fn new(
+        id: impl Into<String>,
+        position: Vec2,
+        size: Vec2,
+        label: impl Into<String>,
+    ) -> Self {
         Checkbox {
+            id: id.into(),
             position,
             size,
             checked: false,
-            label,
+            label: label.into(),
         }
     }
 
@@ -59,6 +66,10 @@ impl Checkbox {
 }
 
 impl Widget for Checkbox {
+    fn id(&self) -> &str {
+        &self.id
+    }
+
     fn draw(&self, renderer: &QuadRenderer) {
         let box_side = self.size.x.min(self.size.y);
         let box_size = Vec2::splat(box_side);
@@ -127,6 +138,7 @@ impl Widget for Checkbox {
                 {
                     self.toggle();
                     Some(WidgetEvent::CheckboxToggled {
+                        id: self.id.clone(),
                         label: self.label.clone(),
                         checked: self.checked,
                     })

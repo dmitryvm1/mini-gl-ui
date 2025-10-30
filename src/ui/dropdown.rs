@@ -277,6 +277,10 @@ impl Dropdown {
 }
 
 impl Widget for Dropdown {
+    fn id(&self) -> &str {
+        &self.id
+    }
+
     fn draw(&self, renderer: &QuadRenderer) {
         let (main_pos, main_size) = self.main_bounds();
         let shadow_offset = Vec2::new(2.0, 3.0);
