@@ -1,6 +1,6 @@
 use crate::colors;
 use crate::renderer::QuadRenderer;
-use crate::ui::{ButtonState, LayoutElement, MouseButton, UiEvent, Widget, WidgetEvent};
+use crate::ui::{ButtonState, Dropdown, LayoutElement, MouseButton, UiEvent, Widget, WidgetEvent};
 use glam::{Vec2, Vec4};
 
 /// A draggable panel that can contain other widgets and be collapsed or expanded.
@@ -11,9 +11,9 @@ pub struct Panel {
     expanded_size: Vec2,
     title: String,
     title_bar_height: f32,
-    background_color: Vec4,
-    title_bar_color: Vec4,
-    border_color: Vec4,
+    background_color_override: Option<Vec4>,
+    title_bar_color_override: Option<Vec4>,
+    border_color_override: Option<Vec4>,
     is_dragging: bool,
     is_collapsed: bool,
     drag_offset: Vec2,
@@ -39,9 +39,9 @@ impl Panel {
             expanded_size,
             title: title.into(),
             title_bar_height,
-            background_color: translucent(colors::SURFACE_DARK, 0.72),
-            title_bar_color: translucent(colors::ACCENT, 0.9),
-            border_color: colors::BORDER_SOFT,
+            background_color_override: None,
+            title_bar_color_override: None,
+            border_color_override: None,
             is_dragging: false,
             is_collapsed: false,
             drag_offset: Vec2::ZERO,
@@ -52,8 +52,8 @@ impl Panel {
 
     /// Sets the panel colors
     pub fn with_colors(mut self, background: Vec4, title_bar: Vec4) -> Self {
-        self.background_color = translucent(background, 0.72);
-        self.title_bar_color = translucent(title_bar, 0.9);
+        self.background_color_override = Some(translucent(background, 0.72));
+        self.title_bar_color_override = Some(translucent(title_bar, 0.9));
         self
     }
 
@@ -158,13 +158,13 @@ impl Panel {
 
     /// Updates the panel colors
     pub fn set_colors(&mut self, background: Vec4, title_bar: Vec4) {
-        self.background_color = translucent(background, 0.72);
-        self.title_bar_color = translucent(title_bar, 0.9);
+        self.background_color_override = Some(translucent(background, 0.72));
+        self.title_bar_color_override = Some(translucent(title_bar, 0.9));
     }
 
     /// Sets the border color
     pub fn set_border_color(&mut self, color: Vec4) {
-        self.border_color = color;
+        self.border_color_override = Some(color);
     }
 
     /// Updates padding applied inside the panel content area
@@ -255,9 +255,67 @@ impl Panel {
         if self.is_collapsed {
             return None;
         }
-        for child in self.children.iter_mut().rev() {
+
+        let capture_pointer = matches!(
+            event,
+            UiEvent::MouseButton {
+                state: ButtonState::Pressed,
+                ..
+            } | UiEvent::Scroll { .. }
+        );
+        let pointer_position = match event {
+            UiEvent::MouseButton { position, .. } => Some(*position),
+            UiEvent::Scroll { position, .. } => Some(*position),
+            _ => None,
+        };
+
+        let overlay_index = if capture_pointer {
+            pointer_position.and_then(|position| {
+                self.children
+                    .iter()
+                    .enumerate()
+                    .rev()
+                    .find_map(|(index, child)| {
+                        child
+                            .widget
+                            .as_any()
+                            .downcast_ref::<Dropdown>()
+                            .filter(|dropdown| dropdown.overlay_contains_point(position))
+                            .map(|_| index)
+                    })
+            })
+        } else {
+            None
+        };
+
+        if let Some(index) = overlay_index {
+            if let Some(child) = self.children.get_mut(index) {
+                if let Some(widget_event) = child.widget.handle_event(event) {
+                    return Some(widget_event);
+                }
+            }
+        }
+
+        let mut pointer_claimed = capture_pointer && overlay_index.is_some();
+
+        for index in (0..self.children.len()).rev() {
+            if Some(index) == overlay_index {
+                continue;
+            }
+            let child = &mut self.children[index];
+            let hit = pointer_position
+                .map_or(false, |position| child.widget.contains_point(position));
+
+            if capture_pointer && pointer_claimed && hit {
+                continue;
+            }
+
             if let Some(widget_event) = child.widget.handle_event(event) {
                 return Some(widget_event);
+            }
+
+            if capture_pointer && hit {
+                pointer_claimed = true;
             }
         }
         None
@@ -281,14 +339,29 @@ impl Panel {
             && point.y <= pos.y + size.y
     }
 
+    fn background_color(&self) -> Vec4 {
+        self.background_color_override
+            .unwrap_or_else(default_panel_background_color)
+    }
+
+    fn title_bar_color(&self) -> Vec4 {
+        self.title_bar_color_override
+            .unwrap_or_else(default_panel_title_bar_color)
+    }
+
+    fn border_color(&self) -> Vec4 {
+        self.border_color_override
+            .unwrap_or_else(colors::border_soft)
+    }
+
     fn draw_toggle_button(&self, renderer: &QuadRenderer, position: Vec2, size: Vec2) {
         let fill_color = if self.is_collapsed {
-            translucent(colors::SURFACE_LIGHT, 0.75)
+            translucent(colors::surface_light(), 0.75)
         } else {
-            translucent(colors::SURFACE, 0.8)
+            translucent(colors::surface(), 0.8)
         };
         renderer.draw_rect(position, size, fill_color);
-        renderer.draw_rect_outline(position, size, colors::BORDER_SOFT, 1.0);
+        renderer.draw_rect_outline(position, size, colors::border_soft(), 1.0);
 
         let symbol = if self.is_collapsed { "+" } else { "-" };
         let symbol_size = renderer.measure_text(symbol);
@@ -296,7 +369,7 @@ impl Panel {
             position.x + (size.x - symbol_size.x) * 0.5,
             position.y + (size.y - symbol_size.y) * 0.5,
         );
-        renderer.draw_text(symbol_pos, colors::TEXT_PRIMARY, symbol);
+        renderer.draw_text(symbol_pos, colors::text_primary(), symbol);
     }
 }
 
@@ -307,12 +380,12 @@ impl Widget for Panel {
 
     fn draw(&self, renderer: &QuadRenderer) {
         let shadow_offset = Vec2::new(3.0, 4.0);
-        renderer.draw_rect(self.position + shadow_offset, self.size, colors::SHADOW);
+        renderer.draw_rect(self.position + shadow_offset, self.size, colors::shadow());
 
         // Draw title bar
         let title_bar_pos = self.position;
         let title_bar_size = Vec2::new(self.size.x, self.title_bar_height);
-        renderer.draw_rect(title_bar_pos, title_bar_size, self.title_bar_color);
+        renderer.draw_rect(title_bar_pos, title_bar_size, self.title_bar_color());
         renderer.draw_rect(
             title_bar_pos,
             Vec2::new(self.size.x, (self.title_bar_height * 0.6).max(1.0)),
@@ -328,14 +401,14 @@ impl Widget for Panel {
             desired_x.max(min_text_x),
             self.position.y + (self.title_bar_height - text_size.y) * 0.5,
         );
-        renderer.draw_text(text_pos, colors::TEXT_PRIMARY, &self.title);
+        renderer.draw_text(text_pos, colors::text_primary(), &self.title);
 
         let content_height = (self.size.y - self.title_bar_height).max(0.0);
         if content_height > 0.5 {
             // Draw panel background
             let panel_pos = Vec2::new(self.position.x, self.position.y + self.title_bar_height);
             let panel_size = Vec2::new(self.size.x, content_height);
-            renderer.draw_rect(panel_pos, panel_size, self.background_color);
+            renderer.draw_rect(panel_pos, panel_size, self.background_color());
             renderer.draw_rect(
                 panel_pos,
                 Vec2::new(self.size.x, (panel_size.y * 0.3).max(1.0)),
@@ -345,7 +418,7 @@ impl Widget for Panel {
             // Draw line separating title bar from content
             let separator_pos = Vec2::new(self.position.x, self.position.y + self.title_bar_height);
             let separator_size = Vec2::new(self.size.x, 2.0);
-            renderer.draw_rect(separator_pos, separator_size, colors::BORDER_SOFT);
+            renderer.draw_rect(separator_pos, separator_size, colors::border_soft());
 
             // Draw child widgets
             for child in &self.children {
@@ -354,14 +427,27 @@ impl Widget for Panel {
         }
 
         // Draw border around the entire panel
-        renderer.draw_rect_outline(self.position, self.size, self.border_color, 2.0);
+        renderer.draw_rect_outline(self.position, self.size, self.border_color(), 2.0);
         if self.size.x > 6.0 && self.size.y > 6.0 {
             renderer.draw_rect_outline(
                 self.position + Vec2::splat(2.0),
                 self.size - Vec2::splat(4.0),
-                colors::BORDER_SUBTLE,
+                colors::border_subtle(),
                 1.0,
             );
+        }
+    }
+
+    fn draw_overlay(&self, renderer: &QuadRenderer) {
+        if self.is_collapsed {
+            return;
+        }
+        let content_height = (self.size.y - self.title_bar_height).max(0.0);
+        if content_height <= 0.5 {
+            return;
+        }
+        for child in &self.children {
+            child.widget.draw_overlay(renderer);
         }
     }
 
@@ -469,6 +555,14 @@ fn translucent(color: Vec4, fallback_alpha: f32) -> Vec4 {
         color.w
     };
     Vec4::new(color.x, color.y, color.z, alpha.clamp(0.45, 0.92))
+}
+
+fn default_panel_background_color() -> Vec4 {
+    translucent(colors::surface_dark(), 0.72)
+}
+
+fn default_panel_title_bar_color() -> Vec4 {
+    translucent(colors::accent(), 0.9)
 }
 
 struct PanelChild {

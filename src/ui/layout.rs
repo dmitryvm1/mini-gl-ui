@@ -1,5 +1,5 @@
 use crate::renderer::QuadRenderer;
-use crate::ui::{UiEvent, Widget, WidgetEvent};
+use crate::ui::{ButtonState, Dropdown, UiEvent, Widget, WidgetEvent};
 use glam::Vec2;
 use std::any::Any;
 use std::slice::{Iter, IterMut};
@@ -265,14 +265,75 @@ impl Widget for HorizontalLayout {
         }
     }
 
+    fn draw_overlay(&self, renderer: &QuadRenderer) {
+        for child in &self.children {
+            child.draw_overlay(renderer);
+        }
+    }
+
     fn type_name(&self) -> &'static str {
         "HorizontalLayout"
     }
 
     fn handle_event(&mut self, event: &UiEvent) -> Option<WidgetEvent> {
-        for child in self.children.iter_mut().rev() {
+        let capture_pointer = matches!(
+            event,
+            UiEvent::MouseButton {
+                state: ButtonState::Pressed,
+                ..
+            } | UiEvent::Scroll { .. }
+        );
+        let pointer_position = match event {
+            UiEvent::MouseButton { position, .. } => Some(*position),
+            UiEvent::Scroll { position, .. } => Some(*position),
+            _ => None,
+        };
+        let overlay_index = if capture_pointer {
+            pointer_position.and_then(|position| {
+                self.children
+                    .iter()
+                    .enumerate()
+                    .rev()
+                    .find_map(|(index, child)| {
+                        child
+                            .as_any()
+                            .downcast_ref::<Dropdown>()
+                            .filter(|dropdown| dropdown.overlay_contains_point(position))
+                            .map(|_| index)
+                    })
+            })
+        } else {
+            None
+        };
+
+        if let Some(index) = overlay_index {
+            if let Some(child) = self.children.get_mut(index) {
+                if let Some(widget_event) = child.handle_event(event) {
+                    return Some(widget_event);
+                }
+            }
+        }
+
+        let mut pointer_claimed = capture_pointer && overlay_index.is_some();
+
+        for index in (0..self.children.len()).rev() {
+            if Some(index) == overlay_index {
+                continue;
+            }
+            let child = &mut self.children[index];
+            let hit = pointer_position
+                .map_or(false, |position| child.contains_point(position));
+
+            if capture_pointer && pointer_claimed && hit {
+                continue;
+            }
+
             if let Some(widget_event) = child.handle_event(event) {
                 return Some(widget_event);
+            }
+
+            if capture_pointer && hit {
+                pointer_claimed = true;
             }
         }
         None
@@ -503,14 +564,75 @@ impl Widget for VerticalLayout {
         }
     }
 
+    fn draw_overlay(&self, renderer: &QuadRenderer) {
+        for child in &self.children {
+            child.draw_overlay(renderer);
+        }
+    }
+
     fn type_name(&self) -> &'static str {
         "VerticalLayout"
     }
 
     fn handle_event(&mut self, event: &UiEvent) -> Option<WidgetEvent> {
-        for child in self.children.iter_mut().rev() {
+        let capture_pointer = matches!(
+            event,
+            UiEvent::MouseButton {
+                state: ButtonState::Pressed,
+                ..
+            } | UiEvent::Scroll { .. }
+        );
+        let pointer_position = match event {
+            UiEvent::MouseButton { position, .. } => Some(*position),
+            UiEvent::Scroll { position, .. } => Some(*position),
+            _ => None,
+        };
+        let overlay_index = if capture_pointer {
+            pointer_position.and_then(|position| {
+                self.children
+                    .iter()
+                    .enumerate()
+                    .rev()
+                    .find_map(|(index, child)| {
+                        child
+                            .as_any()
+                            .downcast_ref::<Dropdown>()
+                            .filter(|dropdown| dropdown.overlay_contains_point(position))
+                            .map(|_| index)
+                    })
+            })
+        } else {
+            None
+        };
+
+        if let Some(index) = overlay_index {
+            if let Some(child) = self.children.get_mut(index) {
+                if let Some(widget_event) = child.handle_event(event) {
+                    return Some(widget_event);
+                }
+            }
+        }
+
+        let mut pointer_claimed = capture_pointer && overlay_index.is_some();
+
+        for index in (0..self.children.len()).rev() {
+            if Some(index) == overlay_index {
+                continue;
+            }
+            let child = &mut self.children[index];
+            let hit = pointer_position
+                .map_or(false, |position| child.contains_point(position));
+
+            if capture_pointer && pointer_claimed && hit {
+                continue;
+            }
+
             if let Some(widget_event) = child.handle_event(event) {
                 return Some(widget_event);
+            }
+
+            if capture_pointer && hit {
+                pointer_claimed = true;
             }
         }
         None

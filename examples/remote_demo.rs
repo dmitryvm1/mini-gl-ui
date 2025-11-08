@@ -240,7 +240,7 @@ fn main() {
         renderer.draw_rect(
             Vec2::ZERO,
             Vec2::new(WINDOW_WIDTH as f32, WINDOW_HEIGHT as f32),
-            colors::SURFACE_DARK,
+            colors::surface_dark(),
         );
         host.draw(&renderer);
         window.swap_buffers();

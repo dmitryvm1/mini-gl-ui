@@ -130,6 +130,11 @@ impl Dropdown {
         }
     }
 
+    /// Returns true when a point falls inside the expanded list overlay.
+    pub(crate) fn overlay_contains_point(&self, point: Vec2) -> bool {
+        self.is_open && self.list_area_contains(point)
+    }
+
     fn visible_range(&self) -> (usize, usize) {
         if self.options.is_empty() {
             return (0, 0);
@@ -274,6 +279,58 @@ impl Dropdown {
         }
         None
     }
+
+    fn draw_list(&self, renderer: &QuadRenderer, list_pos: Vec2, list_size: Vec2) {
+        let shadow_offset = Vec2::new(2.0, 3.0);
+        renderer.draw_rect(list_pos + shadow_offset, list_size, colors::shadow());
+
+        let panel_bg = solid(colors::surface_dark());
+        renderer.draw_rect(list_pos, list_size, panel_bg);
+        renderer.draw_rect_outline(list_pos, list_size, colors::border_soft(), 2.0);
+        if list_size.x > 4.0 && list_size.y > 4.0 {
+            renderer.draw_rect_outline(
+                list_pos + Vec2::splat(2.0),
+                list_size - Vec2::splat(4.0),
+                colors::border_subtle(),
+                1.0,
+            );
+        }
+
+        let (start, end) = self.visible_range();
+        let padding = 10.0;
+        for (i, option_index) in (start..end).enumerate() {
+            let item_pos = Vec2::new(list_pos.x, list_pos.y + i as f32 * self.option_height);
+            let item_size = Vec2::new(self.size.x, self.option_height);
+            let is_selected = Some(option_index) == self.selected_index;
+            let is_hovered = Some(option_index) == self.hovered_index;
+            let item_color = if is_selected {
+                solid(colors::accent_soft())
+            } else if is_hovered {
+                solid(colors::surface_light())
+            } else {
+                solid(colors::surface())
+            };
+
+            renderer.draw_rect(item_pos, item_size, item_color);
+            if is_selected {
+                renderer.draw_rect(
+                    item_pos,
+                    Vec2::new(item_size.x, (item_size.y * 0.3).max(1.0)),
+                    Vec4::new(1.0, 1.0, 1.0, 0.12),
+                );
+            }
+
+            if let Some(option) = self.options.get(option_index) {
+                let option_text = option.as_str();
+                let option_size = renderer.measure_text(option_text);
+                let option_pos = Vec2::new(
+                    item_pos.x + padding,
+                    item_pos.y + (item_size.y - option_size.y) * 0.5,
+                );
+                renderer.draw_text(option_pos, colors::text_primary(), option_text);
+            }
+        }
+    }
 }
 
 impl Widget for Dropdown {
@@ -284,11 +341,11 @@ impl Widget for Dropdown {
     fn draw(&self, renderer: &QuadRenderer) {
         let (main_pos, main_size) = self.main_bounds();
         let shadow_offset = Vec2::new(2.0, 3.0);
-        renderer.draw_rect(main_pos + shadow_offset, main_size, colors::SHADOW);
+        renderer.draw_rect(main_pos + shadow_offset, main_size, colors::shadow());
 
-        let base_bg = translucent(colors::SURFACE, 0.78);
-        let hover_bg = translucent(colors::SURFACE_LIGHT, 0.82);
-        let open_bg = translucent(colors::ACCENT_SOFT, 0.82);
+        let base_bg = translucent(colors::surface(), 0.78);
+        let hover_bg = translucent(colors::surface_light(), 0.82);
+        let open_bg = translucent(colors::accent_soft(), 0.82);
         let bg_color = if self.is_open {
             open_bg
         } else if self.main_hovered {
@@ -305,12 +362,12 @@ impl Widget for Dropdown {
             Vec4::new(1.0, 1.0, 1.0, if self.is_open { 0.16 } else { 0.12 }),
         );
 
-        renderer.draw_rect_outline(main_pos, main_size, colors::BORDER_SOFT, 2.0);
+        renderer.draw_rect_outline(main_pos, main_size, colors::border_soft(), 2.0);
         if main_size.x > 4.0 && main_size.y > 4.0 {
             renderer.draw_rect_outline(
                 main_pos + Vec2::splat(2.0),
                 main_size - Vec2::splat(4.0),
-                colors::BORDER_SUBTLE,
+                colors::border_subtle(),
                 1.0,
             );
         }
@@ -321,9 +378,9 @@ impl Widget for Dropdown {
             .or_else(|| self.placeholder.clone())
             .unwrap_or_else(|| "Select...".to_string());
         let text_color = if self.selected_index.is_some() {
-            colors::TEXT_PRIMARY
+            colors::text_primary()
         } else {
-            colors::TEXT_SECONDARY
+            colors::text_secondary()
         };
         let padding = 10.0;
         let text_size = renderer.measure_text(&display_text);
@@ -339,56 +396,12 @@ impl Widget for Dropdown {
             main_pos.x + main_size.x - arrow_size.x - padding,
             main_pos.y + (main_size.y - arrow_size.y) * 0.5,
         );
-        renderer.draw_text(arrow_pos, colors::TEXT_SECONDARY, arrow_text);
+        renderer.draw_text(arrow_pos, colors::text_secondary(), arrow_text);
+    }
 
+    fn draw_overlay(&self, renderer: &QuadRenderer) {
         if let Some((list_pos, list_size)) = self.list_bounds() {
-            renderer.draw_rect(list_pos + shadow_offset, list_size, colors::SHADOW);
-
-            let panel_bg = translucent(colors::SURFACE_DARK, 0.78);
-            renderer.draw_rect(list_pos, list_size, panel_bg);
-            renderer.draw_rect_outline(list_pos, list_size, colors::BORDER_SOFT, 2.0);
-            if list_size.x > 4.0 && list_size.y > 4.0 {
-                renderer.draw_rect_outline(
-                    list_pos + Vec2::splat(2.0),
-                    list_size - Vec2::splat(4.0),
-                    colors::BORDER_SUBTLE,
-                    1.0,
-                );
-            }
-
-            let (start, end) = self.visible_range();
-            for (i, option_index) in (start..end).enumerate() {
-                let item_pos = Vec2::new(list_pos.x, list_pos.y + i as f32 * self.option_height);
-                let item_size = Vec2::new(self.size.x, self.option_height);
-                let is_selected = Some(option_index) == self.selected_index;
-                let is_hovered = Some(option_index) == self.hovered_index;
-                let item_color = if is_selected {
-                    translucent(colors::ACCENT, 0.82)
-                } else if is_hovered {
-                    translucent(colors::SURFACE_LIGHT, 0.86)
-                } else {
-                    translucent(colors::SURFACE, 0.82)
-                };
-
-                renderer.draw_rect(item_pos, item_size, item_color);
-                if is_selected {
-                    renderer.draw_rect(
-                        item_pos,
-                        Vec2::new(item_size.x, (item_size.y * 0.3).max(1.0)),
-                        Vec4::new(1.0, 1.0, 1.0, 0.12),
-                    );
-                }
-
-                if let Some(option) = self.options.get(option_index) {
-                    let option_text = option.as_str();
-                    let option_size = renderer.measure_text(option_text);
-                    let option_pos = Vec2::new(
-                        item_pos.x + padding,
-                        item_pos.y + (item_size.y - option_size.y) * 0.5,
-                    );
-                    renderer.draw_text(option_pos, colors::TEXT_PRIMARY, option_text);
-                }
-            }
+            self.draw_list(renderer, list_pos, list_size);
         }
     }
 
@@ -504,4 +517,8 @@ fn translucent(color: Vec4, fallback_alpha: f32) -> Vec4 {
         color.w
     };
     Vec4::new(color.x, color.y, color.z, alpha.clamp(0.45, 0.92))
+}
+
+fn solid(color: Vec4) -> Vec4 {
+    Vec4::new(color.x, color.y, color.z, 1.0)
 }

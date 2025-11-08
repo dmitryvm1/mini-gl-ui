@@ -116,6 +116,9 @@ pub trait Widget {
     /// Draws the widget
     fn draw(&self, renderer: &crate::renderer::QuadRenderer);
 
+    /// Draws any overlay content that should appear above other widgets.
+    fn draw_overlay(&self, _renderer: &crate::renderer::QuadRenderer) {}
+
     /// Returns a human-readable widget type name
     fn type_name(&self) -> &'static str;
 

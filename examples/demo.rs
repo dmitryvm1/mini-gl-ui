@@ -563,8 +563,11 @@ fn dispatch_ui_event<'a>(widgets: Vec<&'a mut dyn Widget>, event: &UiEvent) -> V
 }
 
 fn draw_widgets(widgets: Vec<&dyn Widget>, renderer: &QuadRenderer) {
-    for widget in widgets {
+    for widget in &widgets {
         widget.draw(renderer);
+    }
+    for widget in widgets {
+        widget.draw_overlay(renderer);
     }
 }
 
@@ -628,12 +631,12 @@ fn main() {
     }
 
     // Create UI components
-    let mut label = Label::new(
+    let mut label = Label::with_palette_color(
         "main_label",
         Vec2::new(50.0, 50.0),
         Vec2::new(200.0, 40.0),
         "Label \n multiline",
-        colors::ACCENT_SOFT,
+        colors::PaletteSlot::AccentSoft,
     );
 
     let mut button = Button::new(
@@ -681,7 +684,7 @@ fn main() {
         Vec2::new(400.0, 300.0),
         "Draggable Panel",
     )
-    .with_colors(colors::SURFACE_DARK, colors::ACCENT)
+    .with_colors(colors::surface_dark(), colors::accent())
     .with_padding(Vec2::new(18.0, 16.0));
 
     let mut panel_controls_row =
@@ -702,19 +705,19 @@ fn main() {
     let mut panel_layout = VerticalLayout::new("panel_layout", Vec2::ZERO)
         .with_spacing(12.0)
         .with_cross_alignment(CrossAlignment::Start);
-    panel_layout.add_child(Label::new(
+    panel_layout.add_child(Label::with_palette_color(
         "panel_title",
         Vec2::ZERO,
         Vec2::new(260.0, 28.0),
         "Raid Controls",
-        colors::ACCENT_SOFT,
+        colors::PaletteSlot::AccentSoft,
     ));
     panel_layout.add_child(Label::new(
         "panel_subtitle",
         Vec2::ZERO,
         Vec2::new(300.0, 24.0),
         "Toggle quick options directly inside the panel:",
-        colors::TEXT_SECONDARY,
+        colors::text_secondary(),
     ));
     panel_layout.add_child(Checkbox::new(
         "overlay_checkbox",
@@ -754,7 +757,7 @@ fn main() {
         Vec2::ZERO,
         Vec2::new(260.0, 32.0),
         "Party Actions",
-        colors::ACCENT_SOFT,
+        colors::accent_soft(),
     ));
     layout_section.add_child(action_row);
     layout_section.add_child(Checkbox::new(

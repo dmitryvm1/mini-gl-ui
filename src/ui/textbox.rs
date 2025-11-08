@@ -91,16 +91,16 @@ impl Widget for TextBox {
 
     fn draw(&self, renderer: &QuadRenderer) {
         let base_bg = if self.is_focused {
-            colors::SURFACE_LIGHT
+            colors::surface_light()
         } else {
-            colors::SURFACE
+            colors::surface()
         };
         let bg_color = translucent(base_bg, if self.is_focused { 0.82 } else { 0.76 });
 
         renderer.draw_rect(
             self.position + Vec2::new(1.5, 3.0),
             self.size,
-            colors::SHADOW,
+            colors::shadow(),
         );
         renderer.draw_rect(self.position, self.size, bg_color);
         let highlight_height = (self.size.y * 0.35).max(1.0);
@@ -113,23 +113,23 @@ impl Widget for TextBox {
 
         // Draw border
         let border_color = if self.is_focused {
-            colors::ACCENT
+            colors::accent()
         } else {
-            colors::BORDER_SOFT
+            colors::border_soft()
         };
         renderer.draw_rect_outline(self.position, self.size, border_color, 2.0);
         if self.size.x > 4.0 && self.size.y > 4.0 {
             renderer.draw_rect_outline(
                 self.position + Vec2::splat(2.0),
                 self.size - Vec2::splat(4.0),
-                colors::BORDER_SUBTLE,
+                colors::border_subtle(),
                 1.0,
             );
         }
 
         // Draw text content (vertically centered)
         let padding = 6.0;
-        let text_color = colors::TEXT_PRIMARY;
+        let text_color = colors::text_primary();
         if !self.text.is_empty() {
             let x = self.position.x + padding;
             // Align by baseline using font line metrics to avoid vertical jumps

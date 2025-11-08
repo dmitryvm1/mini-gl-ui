@@ -1,4 +1,4 @@
-use mini_gl_ui::{colors, ui::*, Vec2};
+use mini_gl_ui::{colors, ui::*, Vec2, Vec4};
 use serde_json::json;
 
 #[test]
@@ -104,6 +104,23 @@ fn test_label_creation() {
 
     label.set_text("New Text".to_string());
     assert_eq!(label.text(), "New Text");
+}
+
+#[test]
+fn palette_updates_are_reflected_globally() {
+    let original = colors::palette();
+    let mut modified = original;
+    modified.accent = Vec4::new(0.2, 0.4, 0.8, 0.9);
+
+    colors::set_palette(modified);
+
+    assert_eq!(colors::accent(), modified.accent);
+    assert_eq!(
+        colors::palette_color(colors::PaletteSlot::Accent),
+        modified.accent
+    );
+
+    colors::set_palette(original);
 }
 
 #[test]
@@ -481,7 +498,7 @@ fn panel_drag_moves_children() {
             Vec2::ZERO,
             Vec2::new(60.0, 18.0),
             "Inside",
-            colors::ACCENT_SOFT,
+            colors::accent_soft(),
         ),
         Vec2::new(18.0, 24.0),
     );

@@ -9,11 +9,11 @@ pub struct Button {
     position: Vec2,
     size: Vec2,
     label: String,
-    normal_color: Vec4,
-    hover_color: Vec4,
-    pressed_color: Vec4,
-    text_color: Vec4,
-    border_color: Vec4,
+    normal_color_override: Option<Vec4>,
+    hover_color_override: Option<Vec4>,
+    pressed_color_override: Option<Vec4>,
+    text_color_override: Option<Vec4>,
+    border_color_override: Option<Vec4>,
     is_hovered: bool,
     is_pressed: bool,
 }
@@ -31,11 +31,11 @@ impl Button {
             position,
             size,
             label: label.into(),
-            normal_color: translucent(colors::SURFACE_LIGHT, 0.8),
-            hover_color: translucent(colors::ACCENT_SOFT, 0.82),
-            pressed_color: translucent(colors::ACCENT, 0.88),
-            text_color: colors::TEXT_PRIMARY,
-            border_color: colors::BORDER_SOFT,
+            normal_color_override: None,
+            hover_color_override: None,
+            pressed_color_override: None,
+            text_color_override: None,
+            border_color_override: None,
             is_hovered: false,
             is_pressed: false,
         }
@@ -43,9 +43,9 @@ impl Button {
 
     /// Sets the button colors
     pub fn with_colors(mut self, normal: Vec4, hover: Vec4, pressed: Vec4) -> Self {
-        self.normal_color = translucent(normal, 0.8);
-        self.hover_color = translucent(hover, 0.82);
-        self.pressed_color = translucent(pressed, 0.88);
+        self.normal_color_override = Some(translucent(normal, 0.8));
+        self.hover_color_override = Some(translucent(hover, 0.82));
+        self.pressed_color_override = Some(translucent(pressed, 0.88));
         self
     }
 
@@ -71,19 +71,19 @@ impl Button {
 
     /// Updates the button colors
     pub fn set_colors(&mut self, normal: Vec4, hover: Vec4, pressed: Vec4) {
-        self.normal_color = translucent(normal, 0.8);
-        self.hover_color = translucent(hover, 0.82);
-        self.pressed_color = translucent(pressed, 0.88);
+        self.normal_color_override = Some(translucent(normal, 0.8));
+        self.hover_color_override = Some(translucent(hover, 0.82));
+        self.pressed_color_override = Some(translucent(pressed, 0.88));
     }
 
     /// Sets the text color
     pub fn set_text_color(&mut self, color: Vec4) {
-        self.text_color = color;
+        self.text_color_override = Some(color);
     }
 
     /// Sets the border color
     pub fn set_border_color(&mut self, color: Vec4) {
-        self.border_color = color;
+        self.border_color_override = Some(color);
     }
 
     /// Sets hover state
@@ -104,12 +104,25 @@ impl Button {
     /// Gets the current button color based on state
     fn current_color(&self) -> Vec4 {
         if self.is_pressed {
-            self.pressed_color
+            self.pressed_color_override
+                .unwrap_or_else(default_pressed_color)
         } else if self.is_hovered {
-            self.hover_color
+            self.hover_color_override
+                .unwrap_or_else(default_hover_color)
         } else {
-            self.normal_color
+            self.normal_color_override
+                .unwrap_or_else(default_normal_color)
         }
+    }
+
+    fn text_color(&self) -> Vec4 {
+        self.text_color_override
+            .unwrap_or_else(colors::text_primary)
+    }
+
+    fn border_color(&self) -> Vec4 {
+        self.border_color_override
+            .unwrap_or_else(colors::border_soft)
     }
 }
 
@@ -122,7 +135,7 @@ impl Widget for Button {
         let color = self.current_color();
         // Soft drop shadow keeps background subtly visible underneath
         let shadow_offset = Vec2::new(2.0, 3.0);
-        renderer.draw_rect(self.position + shadow_offset, self.size, colors::SHADOW);
+        renderer.draw_rect(self.position + shadow_offset, self.size, colors::shadow());
 
         renderer.draw_rect(self.position, self.size, color);
         let highlight_alpha = if self.is_pressed { 0.08 } else { 0.14 };
@@ -133,12 +146,12 @@ impl Widget for Button {
             Vec4::new(1.0, 1.0, 1.0, highlight_alpha),
         );
 
-        renderer.draw_rect_outline(self.position, self.size, self.border_color, 2.0);
+        renderer.draw_rect_outline(self.position, self.size, self.border_color(), 2.0);
         if self.size.x > 4.0 && self.size.y > 4.0 {
             renderer.draw_rect_outline(
                 self.position + Vec2::splat(2.0),
                 self.size - Vec2::splat(4.0),
-                colors::BORDER_SUBTLE,
+                colors::border_subtle(),
                 1.0,
             );
         }
@@ -148,7 +161,7 @@ impl Widget for Button {
             self.position.x + (self.size.x - text_size.x) * 0.5,
             self.position.y + (self.size.y - text_size.y) * 0.5,
         );
-        renderer.draw_text(text_pos, self.text_color, &self.label);
+        renderer.draw_text(text_pos, self.text_color(), &self.label);
     }
 
     fn type_name(&self) -> &'static str {
@@ -224,4 +237,16 @@ fn translucent(color: Vec4, fallback_alpha: f32) -> Vec4 {
         color.w
     };
     Vec4::new(color.x, color.y, color.z, alpha.clamp(0.45, 0.95))
+}
+
+fn default_normal_color() -> Vec4 {
+    translucent(colors::surface_light(), 0.8)
+}
+
+fn default_hover_color() -> Vec4 {
+    translucent(colors::accent_soft(), 0.82)
+}
+
+fn default_pressed_color() -> Vec4 {
+    translucent(colors::accent(), 0.88)
 }

@@ -1,9 +1,10 @@
+use crate::colors::{self, PaletteSlot};
 use crate::renderer::QuadRenderer;
 use crate::ui::{
-    Button, Checkbox, CrossAlignment, Dropdown, HorizontalLayout, Label, LayoutElement, Panel,
-    TextBox, UiEvent, VerticalLayout, Widget, WidgetEvent,
+    Button, ButtonState, Checkbox, CrossAlignment, Dropdown, HorizontalLayout, Label, LayoutElement,
+    Panel, TextBox, UiEvent, VerticalLayout, Widget, WidgetEvent,
 };
-use crate::{colors, Vec2};
+use crate::Vec2;
 use glam::Vec4;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -365,6 +366,14 @@ impl RemoteUiHost {
                     self.clear_all();
                     report.processed += 1;
                 }
+                "set_palette" => match self.set_palette(&command) {
+                    Ok(()) => report.processed += 1,
+                    Err(err) => report.errors.push(err),
+                },
+                "set_palette_slot" => match self.set_palette_slot(&command) {
+                    Ok(()) => report.processed += 1,
+                    Err(err) => report.errors.push(err),
+                },
                 _ => match self.apply_widget_command(&command) {
                     Ok(()) => report.processed += 1,
                     Err(err) => report.errors.push(err),
@@ -381,6 +390,11 @@ impl RemoteUiHost {
                 widget.draw(renderer);
             }
         }
+        for id in &self.draw_order {
+            if let Some(widget) = self.widgets.get(id) {
+                widget.draw_overlay(renderer);
+            }
+        }
     }
 
     /// Dispatches an input event to hosted widgets, returning emitted events and a hit flag.
@@ -388,17 +402,72 @@ impl RemoteUiHost {
         let mut events = Vec::new();
         let mut mouse_hit = false;
         let mouse_position = Self::event_position(event);
-        for id in self.draw_order.iter().rev() {
-            if let Some(widget) = self.widgets.get_mut(id) {
-                if !mouse_hit {
-                    if let Some(position) = mouse_position {
-                        if widget.contains_point(position) {
-                            mouse_hit = true;
-                        }
+        let capture_pointer = matches!(
+            event,
+            UiEvent::MouseButton {
+                state: ButtonState::Pressed,
+                ..
+            } | UiEvent::Scroll { .. }
+        );
+
+        let overlay_index = if capture_pointer {
+            mouse_position.and_then(|position| {
+                self.draw_order
+                    .iter()
+                    .enumerate()
+                    .rev()
+                    .find_map(|(index, id)| {
+                        self.widgets.get(id).and_then(|widget| match widget {
+                            HostedWidget::Dropdown(dropdown)
+                                if dropdown.overlay_contains_point(position) =>
+                            {
+                                Some(index)
+                            }
+                            _ => None,
+                        })
+                    })
+            })
+        } else {
+            None
+        };
+
+        if let Some(index) = overlay_index {
+            if let Some(id) = self.draw_order.get(index) {
+                if let Some(widget) = self.widgets.get_mut(id) {
+                    mouse_hit = true;
+                    if let Some(widget_event) = widget.handle_event(event) {
+                        events.push(widget_event);
                     }
                 }
+            }
+        }
+
+        let mut pointer_claimed = capture_pointer && overlay_index.is_some();
+
+        for index in (0..self.draw_order.len()).rev() {
+            if Some(index) == overlay_index {
+                continue;
+            }
+
+            let id = &self.draw_order[index];
+            if let Some(widget) = self.widgets.get_mut(id) {
+                let hit = mouse_position
+                    .map_or(false, |position| widget.contains_point(position));
+
+                if !mouse_hit && hit {
+                    mouse_hit = true;
+                }
+
+                if capture_pointer && pointer_claimed && hit {
+                    continue;
+                }
+
                 if let Some(widget_event) = widget.handle_event(event) {
                     events.push(widget_event);
+                }
+
+                if capture_pointer && hit {
+                    pointer_claimed = true;
                 }
             }
         }
@@ -639,12 +708,22 @@ impl RemoteUiHost {
                     })
                     .into_vec2();
                 let text = payload.text.clone().unwrap_or_else(|| "Label".to_string());
-                let color = payload
-                    .color
-                    .clone()
-                    .map(|c| c.into_vec4())
-                    .unwrap_or(colors::ACCENT_SOFT);
-                let label_widget = Label::new(command.id.clone(), position, size, text, color);
+                let label_widget = match payload.color.clone() {
+                    Some(color_payload) => Label::new(
+                        command.id.clone(),
+                        position,
+                        size,
+                        text.clone(),
+                        color_payload.into_vec4(),
+                    ),
+                    None => Label::with_palette_color(
+                        command.id.clone(),
+                        position,
+                        size,
+                        text,
+                        PaletteSlot::AccentSoft,
+                    ),
+                };
                 self.insert_widget(command.id.clone(), HostedWidget::Label(label_widget));
             }
             "textbox" => {
@@ -903,6 +982,34 @@ impl RemoteUiHost {
         self.draw_order.clear();
     }
 
+    fn set_palette(&mut self, command: &RemoteCommand) -> Result<(), RemoteError> {
+        let payload: SetPalettePayload = Self::parse_host_params(command)?;
+        let mut palette = colors::palette();
+        let changed = payload.apply(&mut palette);
+        if changed {
+            colors::set_palette(palette);
+        }
+        Ok(())
+    }
+
+    fn set_palette_slot(&mut self, command: &RemoteCommand) -> Result<(), RemoteError> {
+        let payload: SetPaletteSlotPayload = Self::parse_host_params(command)?;
+        colors::set_palette_slot(payload.slot, payload.color.into_vec4());
+        Ok(())
+    }
+
+    fn parse_host_params<T>(command: &RemoteCommand) -> Result<T, RemoteError>
+    where
+        T: DeserializeOwned,
+    {
+        serde_json::from_value(command.params.clone()).map_err(|err| RemoteError::InvalidParams {
+            id: command.id.clone(),
+            method: command.method.clone(),
+            target: "RemoteUiHost",
+            source: err,
+        })
+    }
+
     fn insert_widget(&mut self, id: String, widget: HostedWidget) {
         self.draw_order.push(id.clone());
         self.widgets.insert(id, widget);
@@ -1008,6 +1115,20 @@ impl HostedWidget {
             HostedWidget::Panel(widget) => widget.draw(renderer),
             HostedWidget::HorizontalLayout(widget) => widget.draw(renderer),
             HostedWidget::VerticalLayout(widget) => widget.draw(renderer),
+            HostedWidget::Attached(_) => {}
+        }
+    }
+
+    fn draw_overlay(&self, renderer: &QuadRenderer) {
+        match self {
+            HostedWidget::Button(widget) => widget.draw_overlay(renderer),
+            HostedWidget::Checkbox(widget) => widget.draw_overlay(renderer),
+            HostedWidget::Label(widget) => widget.draw_overlay(renderer),
+            HostedWidget::TextBox(widget) => widget.draw_overlay(renderer),
+            HostedWidget::Dropdown(widget) => widget.draw_overlay(renderer),
+            HostedWidget::Panel(widget) => widget.draw_overlay(renderer),
+            HostedWidget::HorizontalLayout(widget) => widget.draw_overlay(renderer),
+            HostedWidget::VerticalLayout(widget) => widget.draw_overlay(renderer),
             HostedWidget::Attached(_) => {}
         }
     }
@@ -1700,11 +1821,16 @@ impl<'a> RemoteTarget for LabelTarget<'a> {
             }
             "set_text" => {
                 let payload: TextPayload = parse_params(method, target, params)?;
+                log::debug!("Setting label text: {}", payload.text);
                 self.label.set_text(payload.text);
             }
             "set_color" => {
                 let payload: ColorPayload = parse_params(method, target, params)?;
                 self.label.set_color(payload.into_vec4());
+            }
+            "set_palette_color" => {
+                let payload: PaletteSlotPayload = parse_params(method, target, params)?;
+                self.label.set_palette_color(payload.slot);
             }
             other => return Err(TargetError::unsupported(other, target)),
         }
@@ -2113,6 +2239,110 @@ struct CreateWidgetPayload {
     option_height: Option<f32>,
     #[serde(default)]
     selected_index: Option<usize>,
+}
+
+#[derive(Clone, Deserialize)]
+struct PaletteSlotPayload {
+    slot: PaletteSlot,
+}
+
+#[derive(Clone, Deserialize)]
+struct SetPalettePayload {
+    #[serde(default)]
+    text_primary: Option<ColorPayload>,
+    #[serde(default)]
+    text_secondary: Option<ColorPayload>,
+    #[serde(default)]
+    surface_dark: Option<ColorPayload>,
+    #[serde(default)]
+    surface: Option<ColorPayload>,
+    #[serde(default)]
+    surface_light: Option<ColorPayload>,
+    #[serde(default)]
+    accent: Option<ColorPayload>,
+    #[serde(default)]
+    accent_soft: Option<ColorPayload>,
+    #[serde(default)]
+    border_soft: Option<ColorPayload>,
+    #[serde(default)]
+    border_subtle: Option<ColorPayload>,
+    #[serde(default)]
+    checkmark: Option<ColorPayload>,
+    #[serde(default)]
+    shadow: Option<ColorPayload>,
+}
+
+impl SetPalettePayload {
+    fn apply(self, palette: &mut colors::Palette) -> bool {
+        let SetPalettePayload {
+            text_primary,
+            text_secondary,
+            surface_dark,
+            surface,
+            surface_light,
+            accent,
+            accent_soft,
+            border_soft,
+            border_subtle,
+            checkmark,
+            shadow,
+        } = self;
+
+        let mut changed = false;
+
+        if let Some(color) = text_primary {
+            palette.text_primary = color.into_vec4();
+            changed = true;
+        }
+        if let Some(color) = text_secondary {
+            palette.text_secondary = color.into_vec4();
+            changed = true;
+        }
+        if let Some(color) = surface_dark {
+            palette.surface_dark = color.into_vec4();
+            changed = true;
+        }
+        if let Some(color) = surface {
+            palette.surface = color.into_vec4();
+            changed = true;
+        }
+        if let Some(color) = surface_light {
+            palette.surface_light = color.into_vec4();
+            changed = true;
+        }
+        if let Some(color) = accent {
+            palette.accent = color.into_vec4();
+            changed = true;
+        }
+        if let Some(color) = accent_soft {
+            palette.accent_soft = color.into_vec4();
+            changed = true;
+        }
+        if let Some(color) = border_soft {
+            palette.border_soft = color.into_vec4();
+            changed = true;
+        }
+        if let Some(color) = border_subtle {
+            palette.border_subtle = color.into_vec4();
+            changed = true;
+        }
+        if let Some(color) = checkmark {
+            palette.checkmark = color.into_vec4();
+            changed = true;
+        }
+        if let Some(color) = shadow {
+            palette.shadow = color.into_vec4();
+            changed = true;
+        }
+
+        changed
+    }
+}
+
+#[derive(Clone, Deserialize)]
+struct SetPaletteSlotPayload {
+    slot: PaletteSlot,
+    color: ColorPayload,
 }
 
 fn default_alpha() -> f32 {

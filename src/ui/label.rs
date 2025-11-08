@@ -1,4 +1,4 @@
-use crate::colors;
+use crate::colors::{self, PaletteSlot};
 use crate::renderer::QuadRenderer;
 use crate::ui::Widget;
 use glam::{Vec2, Vec4};
@@ -9,6 +9,7 @@ pub struct Label {
     position: Vec2,
     size: Vec2,
     color: Vec4,
+    palette_slot: Option<PaletteSlot>,
     text: String,
 }
 
@@ -26,8 +27,22 @@ impl Label {
             position,
             size,
             color,
+            palette_slot: None,
             text: text.into(),
         }
+    }
+
+    /// Creates a label that references a palette slot for its fill color.
+    pub fn with_palette_color(
+        id: impl Into<String>,
+        position: Vec2,
+        size: Vec2,
+        text: impl Into<String>,
+        slot: PaletteSlot,
+    ) -> Self {
+        let mut label = Label::new(id, position, size, text, colors::palette_color(slot));
+        label.palette_slot = Some(slot);
+        label
     }
 
     /// Gets the label text
@@ -43,6 +58,18 @@ impl Label {
     /// Sets the label color
     pub fn set_color(&mut self, color: Vec4) {
         self.color = color;
+        self.palette_slot = None;
+    }
+
+    /// Sets the label color from the active palette.
+    pub fn set_palette_color(&mut self, slot: PaletteSlot) {
+        self.palette_slot = Some(slot);
+    }
+
+    fn fill_color(&self) -> Vec4 {
+        self.palette_slot
+            .map(colors::palette_color)
+            .unwrap_or(self.color)
     }
 
     /// Sets the label size
@@ -62,9 +89,9 @@ impl Widget for Label {
     }
 
     fn draw(&self, renderer: &QuadRenderer) {
-        let fill = translucent(self.color, 0.68);
+        let fill = translucent(self.fill_color(), 0.68);
         let shadow_offset = Vec2::new(1.0, 2.0);
-        renderer.draw_rect(self.position + shadow_offset, self.size, colors::SHADOW);
+        renderer.draw_rect(self.position + shadow_offset, self.size, colors::shadow());
         renderer.draw_rect(self.position, self.size, fill);
         let highlight_height = (self.size.y * 0.35).max(1.0);
         renderer.draw_rect(
@@ -72,12 +99,12 @@ impl Widget for Label {
             Vec2::new(self.size.x, highlight_height),
             Vec4::new(1.0, 1.0, 1.0, 0.08),
         );
-        renderer.draw_rect_outline(self.position, self.size, colors::BORDER_SOFT, 1.5);
+        renderer.draw_rect_outline(self.position, self.size, colors::border_soft(), 1.5);
         if self.size.x > 4.0 && self.size.y > 4.0 {
             renderer.draw_rect_outline(
                 self.position + Vec2::splat(1.5),
                 self.size - Vec2::splat(3.0),
-                colors::BORDER_SUBTLE,
+                colors::border_subtle(),
                 1.0,
             );
         }
@@ -124,10 +151,11 @@ fn translucent(color: Vec4, fallback_alpha: f32) -> Vec4 {
 }
 
 fn readable_text_color(background: Vec4) -> Vec4 {
+
     let luminance = background.x * 0.299 + background.y * 0.587 + background.z * 0.114;
     if luminance > 0.55 {
         colors::BLACK
     } else {
-        colors::TEXT_PRIMARY
+        colors::text_primary()
     }
 }

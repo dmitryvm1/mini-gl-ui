@@ -75,20 +75,20 @@ impl Widget for Checkbox {
         let box_size = Vec2::splat(box_side);
         // Drop shadow softens the element over the scene
         let shadow_offset = Vec2::new(1.5, 2.5);
-        renderer.draw_rect(self.position + shadow_offset, box_size, colors::SHADOW);
-        renderer.draw_rect(self.position, box_size, colors::SURFACE);
+        renderer.draw_rect(self.position + shadow_offset, box_size, colors::shadow());
+        renderer.draw_rect(self.position, box_size, colors::surface());
         let highlight_height = (box_size.y * 0.4).max(1.0);
         renderer.draw_rect(
             self.position,
             Vec2::new(box_size.x, highlight_height),
             Vec4::new(1.0, 1.0, 1.0, 0.1),
         );
-        renderer.draw_rect_outline(self.position, box_size, colors::BORDER_SOFT, 2.0);
+        renderer.draw_rect_outline(self.position, box_size, colors::border_soft(), 2.0);
         if box_size.x > 6.0 && box_size.y > 6.0 {
             renderer.draw_rect_outline(
                 self.position + Vec2::splat(2.0),
                 box_size - Vec2::splat(4.0),
-                colors::BORDER_SUBTLE,
+                colors::border_subtle(),
                 1.0,
             );
         }
@@ -99,8 +99,8 @@ impl Widget for Checkbox {
             let check_pos = self.position + Vec2::splat(inset);
             let check_extent = (box_side - inset * 2.0).max(2.0);
             let check_size = Vec2::splat(check_extent);
-            renderer.draw_rect(check_pos, check_size, colors::CHECKMARK);
-            renderer.draw_rect_outline(check_pos, check_size, colors::BORDER_SOFT, 1.0);
+            renderer.draw_rect(check_pos, check_size, colors::checkmark());
+            renderer.draw_rect_outline(check_pos, check_size, colors::border_soft(), 1.0);
         }
 
         // Draw label to the right of the box
@@ -118,7 +118,7 @@ impl Widget for Checkbox {
                 )
             }
         };
-        renderer.draw_text(text_pos, colors::TEXT_PRIMARY, &self.label);
+        renderer.draw_text(text_pos, colors::text_primary(), &self.label);
     }
 
     fn type_name(&self) -> &'static str {
