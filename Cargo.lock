@@ -86,6 +86,9 @@ name = "glam"
 version = "0.24.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5418c17512bdf42730f9032c74e1ae39afc408745ebb2acf72fbc4691c17945"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "glfw"
@@ -165,6 +168,8 @@ dependencies = [
  "gl",
  "glam",
  "glfw",
+ "log",
+ "once_cell",
  "serde",
  "serde_json",
  "thiserror",

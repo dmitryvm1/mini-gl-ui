@@ -2,6 +2,9 @@
 
 A minimal OpenGL UI engine for drawing user interfaces in Rust.
 
+## Screenshot
+![Screenshot](./assets/screenshot.png)
+
 ## Features
 
 This library provides simple and easy-to-use primitives for building OpenGL-based user interfaces:

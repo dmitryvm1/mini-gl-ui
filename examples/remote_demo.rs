@@ -395,7 +395,7 @@ fn bootstrap_scene(channel: &RemoteCommandChannel) {
             "kind": "panel",
             "title": "Remote Console",
             "position": { "x": 36.0, "y": 32.0 },
-            "size": { "width": 360.0, "height": 320.0 }
+            "size": { "width": 360.0, "height": 420.0 }
         }),
     );
     enqueue(
